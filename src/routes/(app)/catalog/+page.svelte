@@ -1,0 +1,330 @@
+<script lang="ts">
+	import { ui, currentRows, mutate, keys } from '$lib/client/store.svelte';
+	import { normalizeName } from '$lib/types';
+	import { uuid } from '$lib/client/uuid';
+	import Star from '@lucide/svelte/icons/star';
+
+	const rows = $derived.by(() => {
+		ui.rev;
+		return currentRows();
+	});
+
+	interface Row {
+		id: string;
+		name: string;
+		note: string;
+		is_staple: boolean;
+		on_list: boolean;
+	}
+
+	const items = $derived(
+		[...rows.items.values()]
+			.filter((i) => !i.deleted_at)
+			.map<Row>((i) => ({
+				id: i.id,
+				name: i.name,
+				note: i.note,
+				is_staple: !!i.is_staple,
+				on_list: !!rows.listState.get(i.id)?.on_list
+			}))
+			.sort((a, b) => a.name.localeCompare(b.name))
+	);
+
+	let q = $state('');
+	let staplesOnly = $state(false);
+	let editing = $state<string | null>(null);
+	let draftName = $state('');
+	let draftNote = $state('');
+
+	const filtered = $derived(
+		items.filter(
+			(i) =>
+				(!staplesOnly || i.is_staple) &&
+				(!q.trim() || i.name.toLowerCase().includes(q.trim().toLowerCase()))
+		)
+	);
+
+	// near-duplicate name groups (normalized) — a light nudge, not automatic
+	const dupeGroups = $derived.by(() => {
+		const byNorm = new Map<string, Row[]>();
+		for (const i of items) {
+			const k = normalizeName(i.name);
+			let g = byNorm.get(k);
+			if (!g) byNorm.set(k, (g = []));
+			g.push(i);
+		}
+		return [...byNorm.values()].filter((g) => g.length > 1);
+	});
+
+	function open(i: Row) {
+		editing = i.id;
+		draftName = i.name;
+		draftNote = i.note;
+	}
+	function save(i: Row) {
+		const n = draftName.trim();
+		if (n && n !== i.name) mutate({ type: 'rename_item', item_id: i.id, name: n });
+		if (draftNote !== i.note) mutate({ type: 'set_note', item_id: i.id, note: draftNote });
+		editing = null;
+	}
+	function addToList(i: Row) {
+		mutate({
+			type: 'add_item',
+			item_id: i.id,
+			name: i.name,
+			position: keys.after(null),
+			scope_place_id: ''
+		});
+	}
+	function del(i: Row) {
+		if (confirm(`Delete "${i.name}" from your items? This forgets where it goes.`)) {
+			mutate({ type: 'delete_item', item_id: i.id });
+			editing = null;
+		}
+	}
+	function newItem() {
+		const name = q.trim();
+		if (!name) return;
+		mutate({
+			type: 'add_item',
+			item_id: uuid(),
+			name,
+			position: keys.after(null),
+			scope_place_id: ''
+		});
+		q = '';
+	}
+</script>
+
+<svelte:head><title>Items</title></svelte:head>
+
+<header>
+	<div class="topbar">
+		<a class="link back" href="/">‹ List</a>
+		<strong>Items</strong>
+		<span></span>
+	</div>
+	<div class="tools">
+		<input
+			bind:value={q}
+			placeholder="Search items"
+			onkeydown={(e) => e.key === 'Enter' && !filtered.length && newItem()}
+		/>
+		<label><input type="checkbox" bind:checked={staplesOnly} /> Staples only</label>
+	</div>
+</header>
+
+<main>
+	{#if dupeGroups.length && !staplesOnly && !q}
+		<div class="dupes">
+			{#each dupeGroups as g}
+				<div class="dupe">
+					Possible duplicates: {g.map((x) => `"${x.name}"`).join(', ')} — rename or delete the extras
+					below.
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if !filtered.length}
+		<p class="empty">
+			{#if q.trim()}
+				No item called “{q.trim()}”. <button class="link" onclick={newItem}>Add it</button>
+			{:else if staplesOnly}
+				No staples yet. Open an item and mark it a staple.
+			{:else}
+				No items yet.
+			{/if}
+		</p>
+	{/if}
+
+	{#each filtered as i (i.id)}
+		<div class="item" class:open={editing === i.id}>
+			<div class="line">
+				<button
+					class="star"
+					class:on={i.is_staple}
+					title={i.is_staple ? 'Unmark staple' : 'Mark as staple'}
+					onclick={() => mutate({ type: 'set_staple', item_id: i.id, is_staple: !i.is_staple })}
+				>
+					<Star size={20} fill={i.is_staple ? 'currentColor' : 'none'} />
+				</button>
+				<button class="body" onclick={() => (editing === i.id ? (editing = null) : open(i))}>
+					<span class="name">{i.name}</span>
+					{#if i.note}<span class="note">{i.note}</span>{/if}
+				</button>
+				{#if i.on_list}
+					<span class="badge">on list</span>
+				{:else}
+					<button class="add" onclick={() => addToList(i)}>+ list</button>
+				{/if}
+			</div>
+			{#if editing === i.id}
+				<div class="edit">
+					<input bind:value={draftName} placeholder="Name" onkeydown={(e) => e.key === 'Enter' && save(i)} />
+					<input bind:value={draftNote} placeholder="Note (2%, big jug…)" onkeydown={(e) => e.key === 'Enter' && save(i)} />
+					<div class="editbtns">
+						<button class="del" onclick={() => del(i)}>Delete</button>
+						<button class="done" onclick={() => save(i)}>Done</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/each}
+</main>
+
+<style>
+	header {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		background: var(--bg);
+		border-bottom: 1px solid var(--line);
+	}
+	.topbar {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		padding: 0.5rem 0.7rem 0.2rem;
+	}
+	.topbar strong {
+		text-align: center;
+	}
+	.link {
+		background: none;
+		border: 0;
+		color: var(--accent);
+		font-size: 0.9rem;
+		text-decoration: none;
+		padding: 0.2rem;
+	}
+	.tools {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
+		padding: 0.3rem 0.7rem 0.6rem;
+	}
+	.tools input:not([type='checkbox']) {
+		flex: 1;
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--line);
+		border-radius: 0.5rem;
+		background: var(--surface);
+		color: inherit;
+	}
+	.tools label {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.85rem;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+	main {
+		padding-bottom: 3rem;
+	}
+	.dupes {
+		padding: 0.5rem 0.7rem;
+	}
+	.dupe {
+		font-size: 0.8rem;
+		color: var(--muted);
+		background: var(--surface-2);
+		border-radius: 0.5rem;
+		padding: 0.5rem 0.6rem;
+		margin-bottom: 0.4rem;
+	}
+	.empty {
+		padding: 1rem 0.7rem;
+		color: var(--muted);
+	}
+	.item {
+		border-bottom: 1px solid var(--line);
+	}
+	.line {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.15rem 0.6rem;
+		min-height: 2.9rem;
+	}
+	.star {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
+		background: none;
+		border: 0;
+		color: var(--muted);
+		padding: 0.5rem 0.3rem;
+	}
+	.star.on {
+		color: #f59e0b;
+	}
+	.body {
+		flex: 1;
+		text-align: left;
+		background: none;
+		border: 0;
+		padding: 0.5rem 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 0;
+	}
+	.name {
+		font-size: 1rem;
+	}
+	.note {
+		font-size: 0.78rem;
+		color: var(--muted);
+	}
+	.badge {
+		flex: none;
+		font-size: 0.7rem;
+		color: var(--muted);
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		padding: 0.1rem 0.5rem;
+	}
+	.add {
+		flex: none;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: 0.5rem;
+		padding: 0.35rem 0.6rem;
+		font-size: 0.85rem;
+		color: var(--accent);
+	}
+	.edit {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		padding: 0 0.6rem 0.7rem 2rem;
+	}
+	.edit input {
+		flex: 1 1 8rem;
+		padding: 0.5rem;
+		border: 1px solid var(--line);
+		border-radius: 0.5rem;
+		background: var(--surface);
+		color: inherit;
+	}
+	.editbtns {
+		display: flex;
+		justify-content: space-between;
+		width: 100%;
+	}
+	.del {
+		background: none;
+		border: 0;
+		color: var(--danger);
+		font-size: 0.85rem;
+	}
+	.done {
+		background: var(--accent);
+		color: #fff;
+		border: 0;
+		border-radius: 0.5rem;
+		padding: 0.4rem 0.9rem;
+	}
+</style>

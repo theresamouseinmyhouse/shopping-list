@@ -1,0 +1,13 @@
+node_modules
+/build
+/.svelte-kit
+/data
+/test-results
+/playwright-report
+/blob-report
+.git
+e2e
+scripts/serve.mjs
+scripts/e2e-server.mjs
+*.env
+!list.env.example

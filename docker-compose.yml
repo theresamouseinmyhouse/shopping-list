@@ -1,0 +1,12 @@
+services:
+  list:
+    build: .
+    image: list:local
+    container_name: listapp
+    restart: unless-stopped
+    ports:
+      - "2120:3000"
+    env_file:
+      - list.env
+    volumes:
+      - ./data:/data
