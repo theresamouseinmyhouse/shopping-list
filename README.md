@@ -26,35 +26,56 @@ password" screen.
 
 ## Self-host
 
-You need Docker and (for the installable PWA + offline sync) HTTPS in front of it.
+Needs Docker. No config file required — you set the password from the browser on
+first visit. For the installable PWA and offline sync you also need HTTPS (below).
+
+### Plain HTTP (a LAN, or behind a proxy you already run)
 
 ```sh
 git clone https://github.com/theresamouseinmyhouse/shopping-list.git
 cd shopping-list
-cp list.env.example list.env          # set LIST_SECRET; LIST_PASSWORD is optional
-docker compose up -d --build          # -> http://localhost:2120
+docker compose up -d           # pulls the prebuilt image -> http://localhost:2120
 ```
 
-Or without compose: `./run-list.sh` (same thing), or by hand:
+One container, no compose:
 
 ```sh
-docker build -t list:local .
 docker run -d --name listapp --restart unless-stopped \
-  -p 2120:3000 --env-file list.env -v "$PWD/data:/data" list:local
+  -p 2120:3000 -v list-data:/data \
+  ghcr.io/theresamouseinmyhouse/shopping-list:latest
 ```
 
-- **`list.env`** — `LIST_SECRET` (required; 64+ random chars, signs the session
-  cookie). `LIST_PASSWORD` optional: leave it unset and the first visit lets you
-  pick the password; set it to pre-seed or rotate. `LIST_API_TOKEN` optional, for
-  `POST /api/quick-add`.
-- **Data** — SQLite lives on the `./data` bind mount (`/data` in the container).
-  Back that folder up.
-- **Reverse proxy** — put nginx / Caddy / Traefik in front for TLS. Turn response
-  buffering off on `/api/events` (it's an SSE stream) — e.g. nginx
-  `proxy_buffering off;`, Caddy `flush_interval -1`. The session cookie is marked
-  `Secure` only when the proxy sends `X-Forwarded-Proto: https`, so plain-HTTP
-  access must be on `localhost` or a LAN IP (where the browser tolerates it, but
-  the service worker / install prompt won't run).
+Open the app and pick a shared password on the first screen.
+
+### HTTPS with an automatic certificate (Caddy)
+
+```sh
+cd shopping-list
+echo "DOMAIN=list.example.com" > .env      # a real hostname pointing at this host
+docker compose -f docker-compose.yml -f compose.https.yml up -d
+```
+
+Caddy gets a Let's Encrypt cert for `$DOMAIN` and proxies it to the app (SSE
+included). Ports 80 and 443 must be reachable from the internet. Already run your
+own proxy instead? Point it at `:2120`, forward `X-Forwarded-Proto`, and disable
+response buffering on `/api/events` (nginx `proxy_buffering off;`).
+
+### Configuration — all optional (`list.env`)
+
+| var | default | purpose |
+|--|--|--|
+| `LIST_PASSWORD` | unset → set it on first visit | pre-seed the shared password; edit + restart to change it |
+| `LIST_SECRET` | generated, stored in the DB | session-cookie signing key; set it only to pin it into your backups |
+| `LIST_API_TOKEN` | unset → session required | bearer token for `POST /api/quick-add` (voice assistants, scripts) |
+
+`cp list.env.example list.env`, uncomment what you need; compose reads it
+automatically.
+
+### Data, backup, updates
+
+SQLite lives at `/data` — the `./data` folder (compose) or the `list-data`
+volume. Back it up. To update: `docker compose pull && docker compose up -d`, or
+`git pull && docker compose up -d --build` if you build from source.
 
 ## Model
 

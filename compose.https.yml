@@ -1,0 +1,27 @@
+# Overlay that puts Caddy in front with an automatic Let's Encrypt certificate.
+#
+#   echo "DOMAIN=list.example.com" > .env      # a real hostname pointing here
+#   docker compose -f docker-compose.yml -f compose.https.yml up -d
+#
+# Ports 80 and 443 must be reachable from the internet for the ACME challenge.
+services:
+  list:
+    # No longer published directly; Caddy reaches it over the compose network.
+    ports: !override []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to list:3000
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - list
+
+volumes:
+  caddy-data:
+  caddy-config:

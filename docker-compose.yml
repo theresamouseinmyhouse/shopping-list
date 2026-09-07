@@ -1,12 +1,15 @@
 services:
   list:
+    # Pull the prebuilt image by default; `docker compose up -d --build` builds locally.
+    image: ghcr.io/theresamouseinmyhouse/shopping-list:latest
     build: .
-    image: list:local
     container_name: listapp
     restart: unless-stopped
     ports:
       - "2120:3000"
     env_file:
-      - list.env
+      # Optional — nothing here is required. Needs Compose v2.24+.
+      - path: list.env
+        required: false
     volumes:
       - ./data:/data
