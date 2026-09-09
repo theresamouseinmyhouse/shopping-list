@@ -24,7 +24,8 @@ export default defineConfig({
 			workbox: {
 				// Precache the app shell; never cache API responses (they go through Dexie + /api/sync).
 				navigateFallback: '/',
-				navigateFallbackDenylist: [/^\/api\//, /^\/login/],
+				// /recipes/* is server-rendered (online-only) — must not get the SPA shell
+				navigateFallbackDenylist: [/^\/api\//, /^\/login/, /^\/recipes/],
 				globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
 				runtimeCaching: []
 			}

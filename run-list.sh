@@ -4,20 +4,23 @@
 set -e
 cd "$(dirname "$0")"
 
-# On Git Bash / MSYS, stop the "/data" mount target being path-mangled.
+# On Git Bash / MSYS, stop the "/data" mount target being path-mangled — and pass
+# host paths in Windows form (`pwd -W`), since the docker.exe we're calling can't
+# open an MSYS "/c/..." path for --env-file / -v.
 : "${MSYS_NO_PATHCONV:=1}"
 export MSYS_NO_PATHCONV
+HOSTPWD="$(pwd -W 2>/dev/null || pwd)"
 
 docker build -t list:local .
 docker rm -f listapp 2>/dev/null || true
 
 mkdir -p ./data
-[ -f ./list.env ] && ENVOPT="--env-file $PWD/list.env" || ENVOPT=""
+[ -f ./list.env ] && ENVOPT="--env-file $HOSTPWD/list.env" || ENVOPT=""
 
 docker run -d --name listapp --restart unless-stopped \
   -p 2120:3000 \
   $ENVOPT \
-  -v "$PWD/data:/data" \
+  -v "$HOSTPWD/data:/data" \
   list:local
 
 echo "listapp up on http://localhost:2120 — logs: docker logs -f listapp"

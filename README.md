@@ -67,6 +67,8 @@ response buffering on `/api/events` (nginx `proxy_buffering off;`).
 | `LIST_PASSWORD` | unset → set it on first visit | pre-seed the shared password; edit + restart to change it |
 | `LIST_SECRET` | generated, stored in the DB | session-cookie signing key; set it only to pin it into your backups |
 | `LIST_API_TOKEN` | unset → session required | bearer token for `POST /api/quick-add` (voice assistants, scripts) |
+| `LIST_GEMINI_API_KEY` | unset → AI import off | Gemini key for **Recipes → Import** from a photo, or a link with no structured data |
+| `LIST_GEMINI_MODEL` | `gemini-2.5-flash` | model used for AI import |
 
 `cp list.env.example list.env`, uncomment what you need; compose reads it
 automatically.
@@ -88,6 +90,14 @@ volume. Back it up. To update: `docker compose pull && docker compose up -d`, or
   default that places inherit.
 - Every row carries `rev` (global monotonic counter); `/api/sync` returns rows with
   `rev > cursor`. Conflict policy: last-write-wins by `rev`.
+- `recipes` / `recipe_steps` / `recipe_ingredients` / `recipe_links` /
+  `recipe_step_ingredients` / `item_aliases` — a small **method-first** recipe keeper
+  at `/recipes` (server-rendered, online-only, **not** synced). One canonical
+  ingredient list; steps are prose and link to ingredients whose names they mention.
+  Printable view, sub-recipes embedded inline. Import parses locally first (schema.org
+  JSON-LD, microdata, then a plain-text heuristic); AI (`LIST_GEMINI_API_KEY`) is an
+  explicit fallback and only needed for photos or messy pages. "Add to list" pushes a
+  recipe (and its sub-recipes) onto the shopping list.
 
 ## v1.1 ideas
 

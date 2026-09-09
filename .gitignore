@@ -21,6 +21,7 @@ Thumbs.db
 
 # Runtime data (SQLite DB lives here, host-bind-mounted in the container)
 /data
+/data-dev
 
 # Vite
 vite.config.js.timestamp-*

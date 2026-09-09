@@ -5,7 +5,13 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		// adapter-node can't tell http from https without x-forwarded-proto, so its
+		// same-origin guess is wrong on the plain-http path and SvelteKit's built-in
+		// form-CSRF check 403s every form action. hooks.server.ts does its own
+		// Host-based origin check instead (works for direct access + a Host-
+		// forwarding proxy; LIST_TRUSTED_ORIGINS covers anything else).
+		csrf: { checkOrigin: false }
 	}
 };
 

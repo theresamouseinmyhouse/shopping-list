@@ -41,6 +41,33 @@ function applyOne(db: DB, op: Op): void {
 type Handler<T extends Op['type']> = (db: DB, op: Extract<Op, { type: T }>) => void;
 type Handlers = { [T in Op['type']]: Handler<T> };
 
+/**
+ * Find a live catalog item whose name (or a singular/plural variant) matches `name`,
+ * preferring an exact normalized hit. Shared by `add_item` and the recipe module.
+ */
+export function matchCatalogItem(db: DB, name: string): string | null {
+	const norm = normalizeName(name);
+	const norms = [...new Set(nameVariants(name).map(normalizeName))].filter(Boolean);
+	if (!norms.length) return null;
+	const hits = db
+		.prepare(
+			`SELECT id, name_norm FROM items
+			 WHERE deleted_at IS NULL AND name_norm IN (${norms.map(() => '?').join(',')})`
+		)
+		.all(...norms) as { id: string; name_norm: string }[];
+	const hit = hits.find((h) => h.name_norm === norm) ?? hits[0];
+	if (hit) return hit.id;
+
+	// fall back to the alias table ("granulated sugar" -> the "sugar" item)
+	const alias = db
+		.prepare(
+			`SELECT a.item_id FROM item_aliases a JOIN items i ON i.id = a.item_id
+			 WHERE i.deleted_at IS NULL AND a.alias_norm IN (${norms.map(() => '?').join(',')}) LIMIT 1`
+		)
+		.get(...norms) as { item_id: string } | undefined;
+	return alias ? alias.item_id : null;
+}
+
 function getPlacement(db: DB, itemId: string, scope: PlaceScope): PlacementRow | undefined {
 	return db
 		.prepare(`SELECT * FROM placements WHERE item_id = ? AND scope_place_id = ?`)
@@ -98,16 +125,8 @@ const handlers: Handlers = {
 			| { id: string; deleted_at: number | null }
 			| undefined;
 		if (!row) {
-			// match on the name and its singular/plural variants, preferring an exact hit
-			const norms = [...new Set(nameVariants(op.name).map(normalizeName))];
-			const hits = db
-				.prepare(
-					`SELECT id, name_norm FROM items
-					 WHERE deleted_at IS NULL AND name_norm IN (${norms.map(() => '?').join(',')})`
-				)
-				.all(...norms) as { id: string; name_norm: string }[];
-			const hit = hits.find((h) => h.name_norm === norm) ?? hits[0];
-			if (hit) row = { id: hit.id, deleted_at: null };
+			const hitId = matchCatalogItem(db, op.name);
+			if (hitId) row = { id: hitId, deleted_at: null };
 		}
 		if (!row) {
 			const rev = nextRev(db);

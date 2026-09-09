@@ -133,6 +133,7 @@
 		<nav>
 			<a class="link" href="/catalog">Items</a>
 			<a class="link" href="/sections">Sections</a>
+			<a class="link" href="/recipes">Recipes</a>
 			<button class="link arrange" class:on={arrange} onclick={() => (arrange = !arrange)}>
 				{#if arrange}Done{:else}<ArrowUpDown size={15} /> Arrange{/if}
 			</button>
