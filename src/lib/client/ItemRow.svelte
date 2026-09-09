@@ -70,9 +70,9 @@
 		editing = false;
 	}
 
-	// swipe-right on the row body = check off. A plain tap opens the options
-	// (checking is only the check circle or a full swipe — tapping the label
-	// caused too many mistaken checks).
+	// The label area is inert — checking is the check circle, options is the
+	// chevron. Only a deliberate horizontal swipe-right on the body checks off
+	// (a tap or a vertical scroll never does anything).
 	let dx = $state(0);
 	let start: { x: number; y: number } | null = null;
 	let swiping = $state(false);
@@ -87,18 +87,15 @@
 		if (!start) return;
 		const mx = e.clientX - start.x;
 		const my = e.clientY - start.y;
-		if (!swiping && Math.abs(my) > Math.abs(mx)) {
-			start = null;
+		if (!swiping && (Math.abs(my) > 8 || mx < -8)) {
+			start = null; // vertical scroll or leftward drag — not a check swipe
 			return;
 		}
-		swiping = true;
+		if (mx > 8) swiping = true;
 		dx = Math.max(0, Math.min(mx, 120));
 	}
 	function up() {
-		if (start) {
-			if (dx > 55) toggleCheck();
-			else if (dx < 8) editing ? (editing = false) : openEditor();
-		}
+		if (start && dx > 55) toggleCheck();
 		start = null;
 		swiping = false;
 		dx = 0;
@@ -116,21 +113,13 @@
 				{#if item.checked}<Check size={16} strokeWidth={3} />{/if}
 			</span>
 		</button>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="main"
-			role="button"
-			tabindex="0"
-			aria-label="Options for {item.name}"
 			onpointerdown={down}
 			onpointermove={move}
 			onpointerup={up}
 			onpointercancel={up}
-			onkeydown={(e) => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					editing ? (editing = false) : openEditor();
-				}
-			}}
 		>
 			{#if arrange}
 				<span class="handle item-handle" title="Drag to move" aria-hidden="true">
