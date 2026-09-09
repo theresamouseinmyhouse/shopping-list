@@ -70,7 +70,9 @@
 		editing = false;
 	}
 
-	// tap / swipe-right anywhere on the row body = check off
+	// swipe-right on the row body = check off. A plain tap opens the options
+	// (checking is only the check circle or a full swipe — tapping the label
+	// caused too many mistaken checks).
 	let dx = $state(0);
 	let start: { x: number; y: number } | null = null;
 	let swiping = $state(false);
@@ -94,8 +96,8 @@
 	}
 	function up() {
 		if (start) {
-			const moved = dx;
-			if (moved < 8 || moved > 55) toggleCheck();
+			if (dx > 55) toggleCheck();
+			else if (dx < 8) editing ? (editing = false) : openEditor();
 		}
 		start = null;
 		swiping = false;
@@ -105,11 +107,20 @@
 
 <li class="row" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
 	<div class="rowline" style="transform: translateX({dx}px)" class:swiping>
+		<button
+			class="check"
+			aria-label={item.checked ? `Uncheck ${item.name}` : `Check off ${item.name}`}
+			onclick={toggleCheck}
+		>
+			<span class="dot" class:on={item.checked}>
+				{#if item.checked}<Check size={16} strokeWidth={3} />{/if}
+			</span>
+		</button>
 		<div
 			class="main"
 			role="button"
 			tabindex="0"
-			aria-label="Check off {item.name}"
+			aria-label="Options for {item.name}"
 			onpointerdown={down}
 			onpointermove={move}
 			onpointerup={up}
@@ -117,7 +128,7 @@
 			onkeydown={(e) => {
 				if (e.key === 'Enter' || e.key === ' ') {
 					e.preventDefault();
-					toggleCheck();
+					editing ? (editing = false) : openEditor();
 				}
 			}}
 		>
@@ -126,9 +137,6 @@
 					<GripVertical size={18} />
 				</span>
 			{/if}
-			<span class="check" class:on={item.checked} aria-hidden="true">
-				{#if item.checked}<Check size={16} strokeWidth={3} />{/if}
-			</span>
 			<span class="label">
 				<span class="nm" class:struck={item.checked}>
 					{item.name}{#if item.qty > 1}<span class="qty">×{item.qty}</span>{/if}
@@ -209,7 +217,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
-		padding: 0.1rem 0 0.1rem 0.5rem;
+		padding: 0.1rem 0;
 		min-height: 3rem;
 		touch-action: pan-y;
 		user-select: none;
@@ -226,6 +234,16 @@
 	}
 	.check {
 		flex: none;
+		display: grid;
+		place-items: center;
+		width: 3rem;
+		height: 3rem;
+		padding: 0;
+		background: none;
+		border: 0;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.check .dot {
 		width: 1.6rem;
 		height: 1.6rem;
 		border: 2px solid var(--line);
@@ -234,7 +252,10 @@
 		place-items: center;
 		color: #fff;
 	}
-	.check.on {
+	.check:active .dot {
+		transform: scale(0.9);
+	}
+	.check .dot.on {
 		background: #16a34a;
 		border-color: #16a34a;
 	}
