@@ -115,6 +115,12 @@ describe('sub-recipe links + resolveRecipeTree', () => {
 		const p = saveRecipe(db, null, input({ steps: [step('do it', { includes: ['Nope'] })] }));
 		expect(getRecipe(db, p)!.steps[0].body).toContain('(includes: Nope)');
 	});
+
+	it('an includes title matches a recipe by singular/plural variant', () => {
+		const bits = saveRecipe(db, null, input({ title: 'Vegan Bacon Bits' }));
+		const salt = saveRecipe(db, null, input({ title: 'Broccoli Salad', steps: [step('toss', { includes: ['vegan bacon bit'] })] }));
+		expect(getRecipe(db, salt)!.links.map((l) => l.child_recipe_id)).toEqual([bits]);
+	});
 });
 
 describe('collectListIngredients / addItemsToList', () => {

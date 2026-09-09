@@ -3,8 +3,32 @@
 	import { enhance } from '$app/forms';
 	import RecipeBody from '../../RecipeBody.svelte';
 	import { normalizeName } from '$lib/types';
+	import { parseQuantity, factorFromHave, formatQuantity } from '$lib/scale';
+	import { formatAmount } from '$lib/units';
 	let { data, form } = $props();
 	const tree = $derived(data.tree);
+
+	// ---- serving scaler (display only) -------------------------------------
+	let scale = $state(1);
+	let haveOpen = $state(false);
+	let haveId = $state('');
+	let haveAmt = $state('');
+	const PRESETS = [0.5, 1, 1.5, 2, 3];
+
+	// ingredients with a numeric quantity, for "scale to what I have"
+	const scalable = $derived(
+		tree.ingredients.filter((i) => parseQuantity(i.quantity))
+	);
+	function applyHave() {
+		const ing = scalable.find((i) => i.id === haveId);
+		const n = Number(haveAmt);
+		if (!ing || !n) return;
+		const f = factorFromHave(ing.quantity, n);
+		if (f && f > 0) {
+			scale = Math.round(f * 1000) / 1000;
+			haveOpen = false;
+		}
+	}
 
 	let picking = $state(false);
 	// which candidate names are ticked (all on by default)
@@ -103,8 +127,41 @@
 	<p class="src noprint"><a href={tree.source_url} target="_blank" rel="noreferrer">source</a></p>
 {/if}
 
+<div class="scalebar noprint">
+	<span class="lbl">Scale</span>
+	{#each PRESETS as p (p)}
+		<button class="sc" class:on={scale === p} onclick={() => (scale = p)}>
+			{p === 1 ? '1×' : `${formatQuantity(p)}×`}
+		</button>
+	{/each}
+	<button class="sc" class:on={haveOpen} onclick={() => (haveOpen = !haveOpen)}>to what I have…</button>
+	{#if scale !== 1 && !PRESETS.includes(scale)}
+		<span class="cur">×{formatQuantity(scale)}</span>
+		<button class="sc" onclick={() => (scale = 1)}>reset</button>
+	{/if}
+</div>
+
+{#if haveOpen}
+	<div class="havebox noprint">
+		<p class="hint">Pick an ingredient and say how much you have — everything scales to match.</p>
+		<div class="haverow">
+			<select bind:value={haveId}>
+				<option value="">ingredient…</option>
+				{#each scalable as i (i.id)}
+					<option value={i.id}>{formatAmount(i.quantity, i.unit)} {i.name}</option>
+				{/each}
+			</select>
+			<span class="eq">I have</span>
+			<input type="number" min="0" step="any" bind:value={haveAmt} placeholder="0" />
+			<span class="unit">{scalable.find((i) => i.id === haveId)?.unit || ''}</span>
+			<button class="rec-btn primary" onclick={applyHave}>Scale</button>
+		</div>
+		<p class="hint dim">Rough guide only — spices, salt and leavening often need a human eye.</p>
+	</div>
+{/if}
+
 <article>
-	<RecipeBody recipe={tree} />
+	<RecipeBody recipe={tree} {scale} />
 </article>
 
 <style>
@@ -173,6 +230,68 @@
 	.src {
 		font-size: 0.8rem;
 		margin: 0.2rem 0;
+	}
+	.scalebar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.35rem;
+		margin: 0.5rem 0 0.2rem;
+	}
+	.scalebar .lbl {
+		font-size: 0.8rem;
+		color: var(--muted);
+		margin-right: 0.1rem;
+	}
+	.sc {
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: 0.5rem;
+		padding: 0.25rem 0.55rem;
+		font-size: 0.85rem;
+		color: inherit;
+	}
+	.sc.on {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #fff;
+	}
+	.cur {
+		font-size: 0.85rem;
+		color: var(--accent);
+		font-weight: 600;
+	}
+	.havebox {
+		border: 1px solid var(--line);
+		border-radius: 0.6rem;
+		padding: 0.7rem;
+		margin: 0.3rem 0 0.6rem;
+	}
+	.haverow {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.haverow select,
+	.haverow input {
+		padding: 0.4rem;
+		border: 1px solid var(--line);
+		border-radius: 0.5rem;
+		background: var(--surface);
+		color: inherit;
+		font: inherit;
+	}
+	.haverow input {
+		width: 5rem;
+	}
+	.haverow .eq {
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.hint.dim {
+		opacity: 0.8;
+		margin-top: 0.4rem;
 	}
 	@media print {
 		.noprint {

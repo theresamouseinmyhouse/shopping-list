@@ -7,6 +7,7 @@ import type { DB } from './db';
 import { applyOps, matchCatalogItem } from './sync';
 import { GLOBAL, normalizeName, type Op } from '../types';
 import { uuid } from '../client/uuid';
+import { nameVariants } from '../quantity';
 import { formatAmount } from '../units';
 import {
 	flattenIngredients,
@@ -292,12 +293,15 @@ export function deleteRecipe(db: DB, id: string): void {
 function findRecipeIdByTitle(db: DB, title: string, excludeId: string): string | null {
 	const norm = normalizeName(title);
 	if (!norm) return null;
-	const row = db
+	const norms = [...new Set(nameVariants(title).map(normalizeName))].filter(Boolean);
+	const rows = db
 		.prepare(
-			`SELECT id FROM recipes WHERE title_norm = ? AND deleted_at IS NULL AND id != ? LIMIT 1`
+			`SELECT id, title_norm FROM recipes
+			 WHERE deleted_at IS NULL AND id != ? AND title_norm IN (${norms.map(() => '?').join(',')})`
 		)
-		.get(norm, excludeId) as { id: string } | undefined;
-	return row ? row.id : null;
+		.all(excludeId, ...norms) as { id: string; title_norm: string }[];
+	const hit = rows.find((r) => r.title_norm === norm) ?? rows[0];
+	return hit ? hit.id : null;
 }
 
 // ---------------------------------------------------------------------------
