@@ -369,10 +369,10 @@ test('offline edits queue and sync on reconnect', async ({ page, context }) => {
 test('recipes: create, view, add to list from the sheet', async ({ page }) => {
 	await page.click('nav.tabbar a:has-text("Recipes")');
 	await page.click('.screen-head a:has-text("New")');
-	await page.fill('input.rec-input', 'Test Salad');
-	await page.locator('textarea').first().fill('2 cups spinach\n1 tbsp oil');
-	await page.locator('textarea').nth(1).fill('Toss the spinach with the oil.');
-	await page.click('button[type=submit]:has-text("Create recipe"), .rec-btn:has-text("Save")');
+	await page.locator('input.field').first().fill('Test Salad');
+	await page.locator('textarea.field.big').first().fill('2 cups spinach\n1 tbsp oil');
+	await page.locator('textarea.field.big').nth(1).fill('Toss the spinach with the oil.');
+	await page.click('button[type=submit].btn-primary:has-text("Create recipe")');
 	await expect(page.locator('h1.screen-title')).toHaveText('Test Salad');
 
 	await page.click('.screen-head button:has-text("Add to list")');
