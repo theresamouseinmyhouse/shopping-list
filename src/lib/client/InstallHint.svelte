@@ -60,11 +60,11 @@
 	<div class="hint">
 		{#if ios}
 			<span>Add to your Home Screen: tap <strong>Share</strong> then <strong>Add to Home Screen</strong>.</span>
-			<button onclick={dismiss}>Got it</button>
+			<button class="btn btn-sm" onclick={dismiss}>Got it</button>
 		{:else}
 			<span>Install List as an app?</span>
-			<button class="go" onclick={install}>Install</button>
-			<button onclick={dismiss}>Not now</button>
+			<button class="btn btn-primary" onclick={install}>Install</button>
+			<button class="btn btn-sm" onclick={dismiss}>Not now</button>
 		{/if}
 	</div>
 {/if}
@@ -86,22 +86,9 @@
 		background: var(--surface-2);
 		border: 1px solid var(--line);
 		border-radius: 0.7rem;
-		box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
 	}
 	.hint span {
 		flex: 1;
 		min-width: 12rem;
-	}
-	.hint button {
-		border: 1px solid var(--line);
-		background: var(--bg);
-		border-radius: 0.5rem;
-		padding: 0.35rem 0.7rem;
-		font-size: 0.8rem;
-	}
-	.hint .go {
-		background: var(--accent);
-		color: #fff;
-		border-color: var(--accent);
 	}
 </style>
