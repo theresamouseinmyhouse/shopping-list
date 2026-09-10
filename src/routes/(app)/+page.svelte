@@ -169,7 +169,7 @@
 			{#each stores as g (g.place!.id)}
 				<li class="group" data-id={g.place!.id}>
 					<div class="ghead">
-						<span class="place-handle" aria-hidden="true"><GripVertical size={16} /></span>
+						<span class="place-handle" aria-hidden="true"><GripVertical size={18} /></span>
 						<button class="gname" onclick={() => setPlace(g.place!.id)}>{g.place!.name}</button>
 						<span class="gcount">{g.items.length}</span>
 						<button
@@ -369,13 +369,15 @@
 		flex: none;
 		display: grid;
 		place-items: center;
+		align-self: stretch;
+		min-width: 2.75rem;
 		cursor: grab;
 		touch-action: none;
-		padding: 0.4rem 0.15rem 0.4rem 0.4rem;
+		padding: 0.6rem 0.5rem;
 		color: var(--muted);
 	}
 	.place-handle.spacer {
-		width: 1.35rem;
+		min-width: 2.75rem;
 		cursor: default;
 	}
 	.gname {

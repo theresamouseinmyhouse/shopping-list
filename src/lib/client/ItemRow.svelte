@@ -102,7 +102,7 @@
 
 <li class="row" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
 	<div class="rowline" style="transform: translateX({dx}px)" class:swiping>
-		<span class="handle item-handle" aria-hidden="true"><GripVertical size={18} /></span>
+		<span class="handle item-handle" aria-hidden="true"><GripVertical size={20} /></span>
 		<button
 			class="check"
 			aria-label={item.checked ? `Uncheck ${item.name}` : `Check off ${item.name}`}
@@ -210,9 +210,11 @@
 		flex: none;
 		display: grid;
 		place-items: center;
+		align-self: stretch;
+		min-width: 2.75rem;
 		cursor: grab;
 		touch-action: none;
-		padding: 0.7rem 0.15rem 0.7rem 0.4rem;
+		padding: 0.7rem 0.6rem 0.7rem 0.5rem;
 		color: var(--muted);
 	}
 	.check {
