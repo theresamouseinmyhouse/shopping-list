@@ -12,18 +12,22 @@
 		scale = 1
 	}: { recipe: ResolvedRecipe; embedded?: boolean; hideTitle?: boolean; scale?: number } = $props();
 
-	// collapsed embedded sub-recipes — remembered per device, keyed by sub-recipe id
-	// ("I already made the bacon bits" stays collapsed wherever that recipe is embedded)
-	let collapsed = $state<Record<string, boolean>>({});
+	// Embedded sub-recipes are collapsed by default (keeps the page short). Each
+	// occurrence is independent — keyed by this recipe's id + the render slot, not
+	// the sub-recipe id — and the reader's expand/collapse choice is remembered
+	// per device. `expanded[key] === true` means the reader opened it.
+	let expanded = $state<Record<string, boolean>>({});
 	try {
-		collapsed = JSON.parse(localStorage.getItem('recipe.collapsed') || '{}');
+		expanded = JSON.parse(localStorage.getItem('recipe.expanded') || '{}');
 	} catch {
 		/* private mode / bad json */
 	}
-	function toggleEmbed(id: string) {
-		collapsed[id] = !collapsed[id];
+	const isOpen = (slot: string) => expanded[`${recipe.id}:${slot}`] === true;
+	function toggleEmbed(slot: string) {
+		const key = `${recipe.id}:${slot}`;
+		expanded[key] = !expanded[key];
 		try {
-			localStorage.setItem('recipe.collapsed', JSON.stringify(collapsed));
+			localStorage.setItem('recipe.expanded', JSON.stringify(expanded));
 		} catch {
 			/* ignore */
 		}
@@ -58,20 +62,20 @@
 	});
 </script>
 
-{#snippet child(c: ResolvedChild)}
+{#snippet child(c: ResolvedChild, slot: string)}
 	{#if c.kind === 'recipe'}
-		<div class="embed" class:collapsed={collapsed[c.recipe.id]}>
+		<div class="embed" class:collapsed={!isOpen(slot)}>
 			<button
 				type="button"
 				class="embed-head"
-				aria-expanded={!collapsed[c.recipe.id]}
-				onclick={() => toggleEmbed(c.recipe.id)}
+				aria-expanded={isOpen(slot)}
+				onclick={() => toggleEmbed(slot)}
 			>
 				<ChevronDown class="chev" size={16} />
 				<span class="embed-title">{c.recipe.title}</span>
-				{#if collapsed[c.recipe.id]}<span class="embed-more">show</span>{/if}
+				<span class="embed-more">{isOpen(slot) ? 'hide' : 'show'}</span>
 			</button>
-			<div class="embed-body" hidden={collapsed[c.recipe.id]}>
+			<div class="embed-body" hidden={!isOpen(slot)}>
 				<Self recipe={c.recipe} embedded hideTitle {scale} />
 			</div>
 		</div>
@@ -103,7 +107,7 @@
 	{/each}
 {/if}
 
-{#each recipe.components as c, i (i)}{@render child(c)}{/each}
+{#each recipe.components as c, i (i)}{@render child(c, `c${i}`)}{/each}
 
 {#if recipe.steps.length}
 	<h2>Method</h2>
@@ -119,7 +123,7 @@
 						{#each s.ingredients as ing (ing.id)}<span class="pill">{amount(ing)} {ing.name}</span>{/each}
 					</p>
 				{/if}
-				{#each s.children as c, k (k)}{@render child(c)}{/each}
+				{#each s.children as c, k (k)}{@render child(c, `s${i}.${k}`)}{/each}
 			</li>
 		{/each}
 	</ol>
