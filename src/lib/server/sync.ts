@@ -32,7 +32,15 @@ function markApplied(db: DB, op: Op): void {
 
 function applyOne(db: DB, op: Op): void {
 	if (alreadyApplied(db, op.id)) return;
-	handlers[op.type](db, op as never);
+	const handler = (handlers as Record<string, Handler<Op['type']> | undefined>)[op.type];
+	if (handler) {
+		handler(db, op as never);
+	} else {
+		// A stale client (e.g. one still on the pre-sections-removal build) may send an
+		// op this server no longer knows. Skip it rather than 500 the whole sync batch,
+		// but mark it applied so it never blocks the client's outbox.
+		console.warn(`sync: ignoring unknown op type "${op.type}" (${op.id})`);
+	}
 	markApplied(db, op);
 }
 

@@ -73,6 +73,16 @@ describe('add_item', () => {
 		expect(ls.scope_place_id).toBe('costco');
 	});
 
+	it('ignores an unknown op type (stale client) instead of failing the batch', () => {
+		expect(() =>
+			apply(
+				{ id: 'legacy-1', ts: Date.now(), type: 'add_section', place_id: 'p', name: 'Produce' } as unknown as Op,
+				op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'i1', name: 'Milk', position: KA })
+			)
+		).not.toThrow();
+		expect(changesSince(db, 0).items.map((i) => i.name)).toContain('Milk');
+	});
+
 	it('a second add of the same normalized name reuses the existing catalog item', () => {
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'i1', name: 'Onions', position: KA }));
 		apply(op({ type: 'remove_from_list', item_id: 'i1' }));
