@@ -23,6 +23,18 @@ async function addItem(page: Page, name: string) {
 	await quickAdd(page).press('Enter');
 	await expect(item(page, name)).toBeVisible();
 }
+async function addStore(page: Page, name: string) {
+	await page.click('nav.tabbar a:has-text("Stores")');
+	await page.click('.screen-head button[aria-label="Add store"]');
+	await page.fill('.sheet-panel input.field', name);
+	await page.click('.sheet-panel button:has-text("Add")');
+	await expect(page.locator(`.store-row:has-text("${name}")`)).toBeVisible();
+}
+async function openStore(page: Page, name: string) {
+	await page.click('nav.tabbar a:has-text("Stores")');
+	await page.click(`.store-row:has-text("${name}")`);
+	await expect(page).toHaveURL(/\/stores\/[^/]+$/);
+}
 async function check(page: Page, name: string) {
 	await item(page, name).locator('.check').click();
 }
@@ -102,50 +114,44 @@ test('new items land at the top; drag reorders and persists', async ({ page }) =
 	expect(await listOrder(page)).toEqual(['Bananas', 'Milk', 'Bread']);
 });
 
-test.skip('a per-store order does not change the item in the All view', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('a per-store order does not change the item in the All view', async ({ page }) => {
 	await addItem(page, 'Rice');
 	await addItem(page, 'Beans');
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Costco")');
+
+	await addStore(page, 'Costco');
+	await openStore(page, 'Costco');
 
 	await drag(page, 'Rice', 'Beans'); // Rice after Beans, at Costco only
 	await expect.poll(() => listOrder(page)).toEqual(['Beans', 'Rice']);
 
-	await page.click('button.chip:has-text("All")');
+	await page.click('nav.tabbar a:has-text("List")');
 	expect(await listOrder(page)).toEqual(['Beans', 'Rice']); // All still by the default order (newest-first: Beans, Rice)
 });
 
-test.skip('an item added inside a store only appears there (and in All)', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('an item added inside a store only appears there (and in All)', async ({ page }) => {
 	await addItem(page, 'Milk');
-	page.once('dialog', (d) => d.accept('Hardware'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Hardware")');
+	await addStore(page, 'Hardware');
+	await openStore(page, 'Hardware');
 	await addItem(page, 'Nails');
 
 	await expect(item(page, 'Nails')).toBeVisible();
-	await expect(item(page, 'Milk')).toBeVisible();
+	await expect(item(page, 'Milk')).toBeVisible(); // a global item still shows inside a store
 
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Costco")');
+	await addStore(page, 'Costco');
+	await openStore(page, 'Costco');
 	await expect(item(page, 'Milk')).toBeVisible();
 	await expect(item(page, 'Nails')).toHaveCount(0);
 
-	await page.click('button.chip:has-text("All")');
+	await page.click('nav.tabbar a:has-text("List")');
 	await expect(item(page, 'Nails')).toBeVisible();
 });
 
-test.skip('All view: dragging an item into a store group sorts it there and pins it', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('All view: dragging an item into a store group sorts it there and pins it', async ({ page }) => {
 	await addItem(page, 'Ketchup'); // loose — "Not sorted yet"
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Costco")');
+	await addStore(page, 'Costco');
+	await openStore(page, 'Costco');
 	await addItem(page, 'Paper Towels'); // pinned to Costco
-	await page.click('button.chip:has-text("All")');
+	await page.click('nav.tabbar a:has-text("List")');
 
 	await expect(inGroup(page, 'Costco', 'Paper Towels')).toBeVisible();
 	await drag(page, 'Ketchup', 'Paper Towels'); // drop into the Costco group
@@ -153,18 +159,16 @@ test.skip('All view: dragging an item into a store group sorts it there and pins
 
 	await freshReload(page);
 	await expect(inGroup(page, 'Costco', 'Ketchup')).toBeVisible();
-	await page.click('button.chip:has-text("Costco")');
+	await openStore(page, 'Costco');
 	expect(await listOrder(page)).toContain('Ketchup'); // now on Costco's own list
 });
 
-test.skip('checking off and clearing a store item, then re-adding from All, keeps its store', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('checking off and clearing a store item, then re-adding from All, keeps its store', async ({ page }) => {
 	await addItem(page, 'Pepitas');
-	page.once('dialog', (d) => d.accept('Local Grocery'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Local Grocery")');
+	await addStore(page, 'Local Grocery');
+	await openStore(page, 'Local Grocery');
 	await addItem(page, 'Anchor'); // a second row to drop onto
-	await page.click('button.chip:has-text("All")');
+	await page.click('nav.tabbar a:has-text("List")');
 
 	await drag(page, 'Pepitas', 'Anchor'); // Pepitas -> Local Grocery group
 	await expect(inGroup(page, 'Local Grocery', 'Pepitas')).toBeVisible();
@@ -177,41 +181,39 @@ test.skip('checking off and clearing a store item, then re-adding from All, keep
 	await expect(inGroup(page, 'Local Grocery', 'Pepitas')).toBeVisible();
 });
 
-test.skip('"only show here" pins an item to the current store', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('"only show here" pins an item to the current store', async ({ page }) => {
 	await addItem(page, 'Bulk Rice');
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	page.once('dialog', (d) => d.accept('Corner Store'));
-	await page.click('button.chip.add');
+	await addStore(page, 'Costco');
+	await addStore(page, 'Corner Store');
 
-	await page.click('button.chip:has-text("Costco")');
+	await openStore(page, 'Costco');
 	await openRow(page, 'Bulk Rice');
-	await item(page, 'Bulk Rice').getByRole('button', { name: 'Only show here' }).click();
+	await expect(page.locator('.sheet-panel')).toBeVisible();
+	await page.locator('.sheet-panel').getByRole('button', { name: 'Only show here' }).click();
 
-	await page.click('button.chip:has-text("Corner Store")');
+	await openStore(page, 'Corner Store');
 	await expect(item(page, 'Bulk Rice')).toHaveCount(0);
-	await page.click('button.chip:has-text("Costco")');
+	await openStore(page, 'Costco');
 	await expect(item(page, 'Bulk Rice')).toBeVisible();
 
 	await openRow(page, 'Bulk Rice');
-	await item(page, 'Bulk Rice').getByRole('button', { name: 'Show at every store' }).click();
-	await page.click('button.chip:has-text("Corner Store")');
+	await expect(page.locator('.sheet-panel')).toBeVisible();
+	await page.locator('.sheet-panel').getByRole('button', { name: 'Show at every store' }).click();
+	await openStore(page, 'Corner Store');
 	await expect(item(page, 'Bulk Rice')).toBeVisible();
 });
 
-test.skip('hide an item for one store only', async ({ page }) => {
-	// re-enabled in the Stores-tab task
+test('hide an item for one store only', async ({ page }) => {
 	await addItem(page, 'Soy Milk');
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	await page.click('button.chip:has-text("Costco")');
+	await addStore(page, 'Costco');
+	await openStore(page, 'Costco');
 
 	await openRow(page, 'Soy Milk');
-	await item(page, 'Soy Milk').getByRole('button', { name: 'Hide here' }).click();
+	await expect(page.locator('.sheet-panel')).toBeVisible();
+	await page.locator('.sheet-panel').getByRole('button', { name: 'Hide here' }).click();
 	await expect(page.locator('h2:has-text("Not carried here")')).toBeVisible();
 
-	await page.click('button.chip:has-text("All")');
+	await page.click('nav.tabbar a:has-text("List")');
 	await expect(page.locator('h2:has-text("Not carried here")')).toHaveCount(0);
 });
 

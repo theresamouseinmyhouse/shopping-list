@@ -25,6 +25,7 @@ export default defineConfig({
 				// Precache the app shell; never cache API responses (they go through Dexie + /api/sync).
 				navigateFallback: '/',
 				// /recipes/* is server-rendered (online-only) — must not get the SPA shell
+				// NOTE: /stores and /stores/[id] are in the (app) SPA group — do NOT denylist them.
 				navigateFallbackDenylist: [/^\/api\//, /^\/login/, /^\/recipes/],
 				globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
 				runtimeCaching: []
