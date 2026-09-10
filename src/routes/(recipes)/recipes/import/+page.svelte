@@ -7,6 +7,15 @@
 	let url = $state('');
 	let text = $state('');
 
+	let fileEl = $state<HTMLInputElement>();
+	let photoName = $state('');
+	function openPicker(camera: boolean) {
+		if (!fileEl) return;
+		if (camera) fileEl.setAttribute('capture', 'environment');
+		else fileEl.removeAttribute('capture');
+		fileEl.click();
+	}
+
 	let draft = $state<RecipeInput | null>(null);
 	let choosing = $state(false);
 	$effect(() => {
@@ -120,9 +129,21 @@
 	<form method="POST" action="?/photo" enctype="multipart/form-data" class="box">
 		<h3>From a photo</h3>
 		{#if data.ai}
-			<p class="hint">A clear photo of a recipe page or card. Uses AI.</p>
-			<input class="field" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required />
-			<button class="btn btn-sm btn-primary">Read photo</button>
+			<p class="hint">A clear photo of a recipe page or card (JPEG, PNG or WebP, up to 8&nbsp;MB). Uses AI.</p>
+			<input
+				bind:this={fileEl}
+				name="photo"
+				type="file"
+				accept="image/*"
+				hidden
+				onchange={(e) => (photoName = e.currentTarget.files?.[0]?.name ?? '')}
+			/>
+			<div class="btnrow">
+				<button type="button" class="btn btn-sm" onclick={() => openPicker(true)}>📷 Take a photo</button>
+				<button type="button" class="btn btn-sm" onclick={() => openPicker(false)}>Choose a photo</button>
+			</div>
+			{#if photoName}<p class="hint">Selected: {photoName}</p>{/if}
+			<button class="btn btn-sm btn-primary" disabled={!photoName}>Read photo</button>
 		{:else}
 			<p class="hint">Needs an AI key (<code>LIST_GEMINI_API_KEY</code>). Not configured.</p>
 		{/if}
