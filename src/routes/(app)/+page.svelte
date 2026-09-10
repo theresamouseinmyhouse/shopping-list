@@ -87,7 +87,7 @@
 
 	<div class="groups">
 		{#each stores as g (g.place!.id)}
-			<div class="group" data-id={g.place!.id}>
+			<div class="storegroup" data-id={g.place!.id}>
 				<div class="ghead">
 					<a class="gname" href="/stores/{g.place!.id}">{g.place!.name}</a>
 					<span class="gcount">{g.items.length}</span>
@@ -114,7 +114,7 @@
 			</div>
 		{/each}
 
-		<div class="group loose">
+		<div class="storegroup loose">
 			<div class="ghead">
 				<span class="gname plain">Not sorted yet</span>
 				<span class="gcount">{loose.items.length}</span>
@@ -146,7 +146,7 @@
 			<h2>
 				Checked ({view.checked.length})
 				<span class="grow"></span>
-				<button class="btn-plain" onclick={() => mutate({ type: 'clear_checked' })}>Clear</button>
+				<button class="btn btn-plain" onclick={() => mutate({ type: 'clear_checked' })}>Clear</button>
 			</h2>
 			<ul>
 				{#each view.checked as it (it.id)}<ItemRow item={it} place={GLOBAL} scopeName={placeNameOf(it.scope_place_id)} onOptions={(x) => (optionsFor = x)} />{/each}
@@ -185,7 +185,7 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.group {
+	.storegroup {
 		border-bottom: 1px solid var(--line);
 	}
 	.ghead {

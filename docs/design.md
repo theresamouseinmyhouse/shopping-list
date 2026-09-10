@@ -31,6 +31,9 @@ Grouped cards: `.group` is a bordered surface with 1px divider rows inside. `.gr
 ### `.caption`
 Uppercase text (0.72rem, `--text-3`), used for labels.
 
+### Naming
+The class names `.btn`, `.field`, `.group`, `.row`, `.list`, `.caption` are **reserved for `app.css`**. Component-scoped `<style>` blocks must not reuse them — a global primitive silently landing on a same-named scoped element inflates layout and doubles borders. Namespace locally instead (e.g. `.itemrow`, `.storegroup`).
+
 ### Global `:focus-visible`
 2px accent outline, 4px border-radius, 2px offset.
 

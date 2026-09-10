@@ -63,20 +63,21 @@
 			<h1>List</h1>
 			{#if setup}
 				<p class="lead">Pick a password for this list. Everyone in the household shares it.</p>
-				<label class="field">
+				<label>
 					New password
 					<!-- svelte-ignore a11y_autofocus -->
-					<input type="password" bind:value={password} autocomplete="new-password" autofocus required />
+					<input class="field" type="password" bind:value={password} autocomplete="new-password" autofocus required />
 				</label>
-				<label class="field">
+				<label>
 					Confirm password
-					<input type="password" bind:value={confirm} autocomplete="new-password" required />
+					<input class="field" type="password" bind:value={confirm} autocomplete="new-password" required />
 				</label>
 			{:else}
-				<label class="field">
+				<label>
 					Password
 					<!-- svelte-ignore a11y_autofocus -->
 					<input
+						class="field"
 						type="password"
 						bind:value={password}
 						autocomplete="current-password"
@@ -106,6 +107,13 @@
 		border-radius: var(--r-lg);
 		padding: 1.2rem;
 		max-width: 22rem;
+		margin: 4rem auto;
+	}
+	label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		font-size: var(--fs-sub);
 	}
 	form {
 		display: flex;

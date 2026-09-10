@@ -139,4 +139,4 @@ textarea.field { resize: vertical; min-height: 3rem; }
 	.noprint { display: none !important; }
 }
 
-:global(.drag-ghost) { opacity: 0.4; }
+.drag-ghost { opacity: 0.4; }

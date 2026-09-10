@@ -81,6 +81,7 @@
 		<button class="btn btn-plain" onclick={() => (editing = true)}>Edit</button>
 	{/snippet}
 
+	<div class="page">
 	<ul
 		class="list"
 		data-zone={id}
@@ -132,6 +133,7 @@
 		scopeName={store?.name ?? ''}
 		onClose={() => (optionsFor = null)}
 	/>
+	</div>
 </Screen>
 
 <Sheet open={editing} onClose={() => (editing = false)} title={store?.name ?? 'Store'}>
@@ -155,6 +157,9 @@
 </footer>
 
 <style>
+	.page {
+		padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 4rem);
+	}
 	.list,
 	.extra ul {
 		list-style: none;

@@ -129,7 +129,7 @@
 	{#if !filtered.length}
 		<p class="empty">
 			{#if q.trim()}
-				No item called “{q.trim()}”. <button class="btn-plain" onclick={newItem}>Add it</button>
+				No item called “{q.trim()}”. <button class="btn btn-plain" onclick={newItem}>Add it</button>
 			{:else if staplesOnly}
 				No staples yet. Open an item and mark it a staple.
 			{:else}

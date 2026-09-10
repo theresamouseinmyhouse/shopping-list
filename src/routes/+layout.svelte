@@ -19,12 +19,13 @@
 {#if !chromeless}<BottomTabBar />{/if}
 
 <style>
-	:global(html),
+	:global(html) {
+		font: var(--fs-body) / 1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	}
 	:global(body) {
 		margin: 0;
 		background: var(--bg);
 		color: var(--text);
-		font: var(--fs-body) / 1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 		overscroll-behavior-y: none;
 	}
 	:global(*) { box-sizing: border-box; }

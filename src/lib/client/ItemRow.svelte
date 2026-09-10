@@ -61,7 +61,7 @@
 	}
 </script>
 
-<li class="row" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
+<li class="itemrow" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
 	<div class="rowline" style="transform: translateX({dx}px)" class:swiping>
 		<span class="handle item-handle" aria-hidden="true"><GripVertical size={20} /></span>
 		<button
@@ -95,16 +95,16 @@
 </li>
 
 <style>
-	.row {
+	.itemrow {
 		list-style: none;
 		border-bottom: 1px solid var(--line);
 		background: var(--bg);
 		overflow: hidden;
 	}
-	.row:has(.swiping) {
+	.itemrow:has(.swiping) {
 		background: linear-gradient(to right, var(--good) 0 3rem, var(--bg) 3rem);
 	}
-	.row.dim .label {
+	.itemrow.dim .label {
 		opacity: 0.55;
 	}
 	.rowline {
@@ -196,6 +196,6 @@
 		height: 3rem;
 		background: none;
 		border: 0;
-		color: var(--text-3);
+		color: var(--text-2);
 	}
 </style>

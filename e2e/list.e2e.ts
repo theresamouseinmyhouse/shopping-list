@@ -16,7 +16,7 @@ const item = (page: Page, name: string): Locator => page.locator(`li[data-name="
 const listOrder = (page: Page) => page.locator('.list li[data-name]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.name));
 /** a row inside a named store's group in the All view */
 const inGroup = (page: Page, storeName: string, itemName: string): Locator =>
-	page.locator(`.group:has(.gname:text-is("${storeName}")) li[data-name="${itemName}"]`);
+	page.locator(`.storegroup:has(.gname:text-is("${storeName}")) li[data-name="${itemName}"]`);
 
 async function addItem(page: Page, name: string) {
 	await quickAdd(page).fill(name);
