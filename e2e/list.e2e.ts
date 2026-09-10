@@ -250,27 +250,28 @@ test('Items screen: staples filter, edit, delete, add back to list', async ({ pa
 	await addItem(page, 'Coffee');
 	await addItem(page, 'Sugar');
 
-	await page.click('a[href="/catalog"]');
+	await page.click('nav.tabbar a:has-text("Items")');
+	await expect(page.locator('h1.screen-title')).toHaveText('Items');
 	await expect(page.locator('.item:has-text("Coffee")')).toBeVisible();
 
 	await page.click('.item:has-text("Coffee") .star');
-	await page.check('.tools input[type=checkbox]');
+	await page.check('.staple-toggle input[type=checkbox]');
 	await expect(page.locator('.item:has-text("Coffee")')).toBeVisible();
 	await expect(page.locator('.item:has-text("Sugar")')).toHaveCount(0);
 
-	await page.click('a[href="/"]');
+	await page.click('nav.tabbar a:has-text("List")');
 	await openRow(page, 'Coffee');
 	await item(page, 'Coffee').getByRole('button', { name: 'Remove' }).click();
 	await expect(item(page, 'Coffee')).toHaveCount(0);
 
-	await page.click('a[href="/catalog"]');
+	await page.click('nav.tabbar a:has-text("Items")');
 	await page.click('.item:has-text("Coffee") button:has-text("+ list")');
 	await expect(page.locator('.item:has-text("Coffee") .badge')).toHaveText('on list');
-	await page.click('a[href="/"]');
+	await page.click('nav.tabbar a:has-text("List")');
 	await expect(item(page, 'Coffee')).toBeVisible();
 
-	await page.click('a[href="/catalog"]');
-	await page.uncheck('.tools input[type=checkbox]');
+	await page.click('nav.tabbar a:has-text("Items")');
+	await page.uncheck('.staple-toggle input[type=checkbox]');
 	await page.click('.item:has-text("Sugar") .body');
 	page.once('dialog', (d) => d.accept());
 	await page.click('.item:has-text("Sugar") button:has-text("Delete")');

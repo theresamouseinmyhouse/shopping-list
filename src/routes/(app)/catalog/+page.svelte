@@ -3,6 +3,7 @@
 	import { normalizeName } from '$lib/types';
 	import { uuid } from '$lib/client/uuid';
 	import Star from '@lucide/svelte/icons/star';
+	import Screen from '$lib/nav/Screen.svelte';
 
 	const rows = $derived.by(() => {
 		ui.rev;
@@ -98,23 +99,20 @@
 
 <svelte:head><title>Items</title></svelte:head>
 
-<header>
-	<div class="topbar">
-		<a class="link back" href="/">‹ List</a>
-		<strong>Items</strong>
-		<span></span>
-	</div>
+<Screen title="Items">
+	{#snippet actions()}
+		<label class="staple-toggle"><input type="checkbox" bind:checked={staplesOnly} /> Staples</label>
+	{/snippet}
+
 	<div class="tools">
 		<input
+			class="field"
 			bind:value={q}
 			placeholder="Search items"
 			onkeydown={(e) => e.key === 'Enter' && !filtered.length && newItem()}
 		/>
-		<label><input type="checkbox" bind:checked={staplesOnly} /> Staples only</label>
 	</div>
-</header>
 
-<main>
 	{#if dupeGroups.length && !staplesOnly && !q}
 		<div class="dupes">
 			{#each dupeGroups as g}
@@ -171,58 +169,11 @@
 			{/if}
 		</div>
 	{/each}
-</main>
+</Screen>
 
 <style>
-	header {
-		position: sticky;
-		top: 0;
-		z-index: 10;
-		background: var(--bg);
-		border-bottom: 1px solid var(--line);
-	}
-	.topbar {
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		align-items: center;
-		padding: 0.5rem 0.7rem 0.2rem;
-	}
-	.topbar strong {
-		text-align: center;
-	}
-	.link {
-		background: none;
-		border: 0;
-		color: var(--accent);
-		font-size: 0.9rem;
-		text-decoration: none;
-		padding: 0.2rem;
-	}
-	.tools {
-		display: flex;
-		gap: 0.6rem;
-		align-items: center;
-		padding: 0.3rem 0.7rem 0.6rem;
-	}
-	.tools input:not([type='checkbox']) {
-		flex: 1;
-		padding: 0.5rem 0.6rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		background: var(--surface);
-		color: inherit;
-	}
-	.tools label {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.85rem;
-		color: var(--muted);
-		white-space: nowrap;
-	}
-	main {
-		padding-bottom: 3rem;
-	}
+	.tools { padding: 0 0.7rem 0.6rem; }
+	.staple-toggle { display: flex; align-items: center; gap: 0.3rem; font-size: var(--fs-sub); color: var(--text-2); }
 	.dupes {
 		padding: 0.5rem 0.7rem;
 	}
