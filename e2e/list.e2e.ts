@@ -46,6 +46,8 @@ async function openRow(page: Page, name: string) {
 async function drag(page: Page, name: string, targetName: string) {
 	const handle = item(page, name).locator('.item-handle');
 	const dst = item(page, targetName);
+	await handle.waitFor({ state: 'visible' });
+	await dst.waitFor({ state: 'visible' });
 	const s = await handle.boundingBox();
 	const d = await dst.boundingBox();
 	if (!s || !d) throw new Error('missing boxes');
