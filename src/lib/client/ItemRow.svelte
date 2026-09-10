@@ -135,7 +135,7 @@
 		cursor: grab;
 		touch-action: none;
 		padding: 0.7rem 0.6rem 0.7rem 0.5rem;
-		color: var(--muted);
+		color: var(--text-3);
 	}
 	.check {
 		flex: none;
@@ -196,6 +196,6 @@
 		height: 3rem;
 		background: none;
 		border: 0;
-		color: var(--muted);
+		color: var(--text-3);
 	}
 </style>

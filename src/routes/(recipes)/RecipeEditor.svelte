@@ -353,7 +353,7 @@
 	.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 	.card { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.card h3 { margin: 0; font-size: 0.95rem; }
-	.hint { margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+	.hint { margin: 0; font-size: 0.76rem; color: var(--text-2); line-height: 1.5; }
 	.hint code { background: var(--surface-2); border-radius: 0.25rem; padding: 0 0.25rem; }
 	.mkbar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 	.mk-btn {
@@ -414,8 +414,8 @@
 	.warn code { background: color-mix(in srgb, var(--danger) 18%, transparent); border-radius: 0.25rem; padding: 0 0.2rem; }
 	.steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.steps li { font-size: 0.85rem; }
-	.grp { display: block; font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
-	.stepbody { color: var(--muted); }
+	.grp { display: block; font-weight: 600; color: var(--text-3); font-size: 0.75rem; text-transform: uppercase; }
+	.stepbody { color: var(--text-2); }
 	.uses { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
 	.actions { position: sticky; bottom: 0; background: var(--surface-1); padding: 0.6rem 0; border-top: 1px solid var(--line); display: flex; gap: 0.5rem; }
 	.actions .btn-primary { flex: 1; padding: 0.6rem; }

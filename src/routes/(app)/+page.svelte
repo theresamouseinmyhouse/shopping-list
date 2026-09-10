@@ -146,7 +146,7 @@
 			<h2>
 				Checked ({view.checked.length})
 				<span class="grow"></span>
-				<button class="link" onclick={() => mutate({ type: 'clear_checked' })}>Clear</button>
+				<button class="btn-plain" onclick={() => mutate({ type: 'clear_checked' })}>Clear</button>
 			</h2>
 			<ul>
 				{#each view.checked as it (it.id)}<ItemRow item={it} place={GLOBAL} scopeName={placeNameOf(it.scope_place_id)} onOptions={(x) => (optionsFor = x)} />{/each}

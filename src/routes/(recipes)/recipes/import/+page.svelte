@@ -147,7 +147,7 @@
 	.hint {
 		margin: 0;
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.btnrow {
 		display: flex;
@@ -167,7 +167,7 @@
 		font-size: 0.88rem;
 	}
 	.ok {
-		color: var(--muted);
+		color: var(--text-2);
 		font-size: 0.9rem;
 	}
 	.chooser {
@@ -196,7 +196,7 @@
 		font: inherit;
 	}
 	.opts .both {
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.opts .donev {
 		padding: 0.35rem 0;

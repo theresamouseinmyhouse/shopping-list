@@ -184,7 +184,7 @@
 	.hint {
 		margin: 0.2rem 0 0.5rem;
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.pickhead {
 		display: flex;
@@ -212,7 +212,7 @@
 	}
 	.known {
 		font-size: 0.72rem;
-		color: var(--muted);
+		color: var(--text-3);
 		border: 1px solid var(--line);
 		border-radius: 999px;
 		padding: 0 0.4rem;
@@ -238,7 +238,7 @@
 	}
 	.scalebar .lbl {
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 		margin-right: 0.1rem;
 	}
 	.sc {

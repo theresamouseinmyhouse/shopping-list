@@ -129,7 +129,7 @@
 	{#if !filtered.length}
 		<p class="empty">
 			{#if q.trim()}
-				No item called “{q.trim()}”. <button class="link" onclick={newItem}>Add it</button>
+				No item called “{q.trim()}”. <button class="btn-plain" onclick={newItem}>Add it</button>
 			{:else if staplesOnly}
 				No staples yet. Open an item and mark it a staple.
 			{:else}
@@ -202,7 +202,7 @@
 	}
 	.dupe {
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 		background: var(--surface-2);
 		border-radius: 0.5rem;
 		padding: 0.5rem 0.6rem;
@@ -210,7 +210,7 @@
 	}
 	.empty {
 		padding: 1rem 0.7rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.item {
 		border-bottom: 1px solid var(--line);
@@ -228,7 +228,7 @@
 		place-items: center;
 		background: none;
 		border: 0;
-		color: var(--muted);
+		color: var(--text-3);
 		padding: 0.5rem 0.3rem;
 	}
 	.star.on {
@@ -250,12 +250,12 @@
 	}
 	.note {
 		font-size: 0.78rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.badge {
 		flex: none;
 		font-size: 0.7rem;
-		color: var(--muted);
+		color: var(--text-3);
 		border: 1px solid var(--line);
 		border-radius: 999px;
 		padding: 0.1rem 0.5rem;

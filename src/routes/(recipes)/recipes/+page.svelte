@@ -28,7 +28,7 @@
 
 <style>
 	.empty {
-		color: var(--muted);
+		color: var(--text-2);
 		padding: 1rem 0.7rem;
 	}
 	.row {
@@ -43,6 +43,6 @@
 	}
 	.serves {
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 </style>
