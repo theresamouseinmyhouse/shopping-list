@@ -365,3 +365,19 @@ test('offline edits queue and sync on reconnect', async ({ page, context }) => {
 	await page.reload();
 	await expect(item(page, 'Offline Item')).toBeVisible();
 });
+
+test('recipes: create, view, add to list from the sheet', async ({ page }) => {
+	await page.click('nav.tabbar a:has-text("Recipes")');
+	await page.click('.screen-head a:has-text("New")');
+	await page.fill('input.rec-input', 'Test Salad');
+	await page.locator('textarea').first().fill('2 cups spinach\n1 tbsp oil');
+	await page.locator('textarea').nth(1).fill('Toss the spinach with the oil.');
+	await page.click('button[type=submit]:has-text("Create recipe"), .rec-btn:has-text("Save")');
+	await expect(page.locator('h1.screen-title')).toHaveText('Test Salad');
+
+	await page.click('.screen-head button:has-text("Add to list")');
+	await expect(page.locator('.sheet-panel')).toBeVisible();
+	await page.click('.sheet-panel button[type=submit]:has-text("Add")');
+	await page.click('nav.tabbar a:has-text("List")');
+	await expect(page.locator('li[data-name="spinach"]')).toBeVisible();
+});
