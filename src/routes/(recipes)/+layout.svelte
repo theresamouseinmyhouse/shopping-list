@@ -8,7 +8,7 @@
 
 <style>
 	.wrap {
-		padding: 0.5rem 0.7rem 4rem;
+		padding: 0.5rem 0.7rem calc(var(--tabbar-h) + var(--safe-b) + 0.5rem);
 	}
 	:global(.rec-topbar) { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.4rem 0; border-bottom: 1px solid var(--line); margin-bottom: 0.8rem; }
 	:global(.rec-topbar .spacer) { flex: 1; }

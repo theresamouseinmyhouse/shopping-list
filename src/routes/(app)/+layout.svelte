@@ -32,10 +32,6 @@
 	});
 </script>
 
-<svelte:head>
-	<meta name="theme-color" content="#111827" />
-</svelte:head>
-
 {#if ui.booted && (!ui.online || ui.pending > 0)}
 	<button
 		class="statusbar"
@@ -51,7 +47,7 @@
 
 <InstallHint />
 
-{@render children?.()}
+<div class="group-scroll">{@render children?.()}</div>
 
 <style>
 	/* Floating pill — overlays content, never reflows the page. */
@@ -75,4 +71,5 @@
 	.statusbar.offline {
 		background: var(--muted);
 	}
+	.group-scroll { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 0.5rem); min-height: 100vh; }
 </style>

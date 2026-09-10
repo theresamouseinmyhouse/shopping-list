@@ -58,6 +58,26 @@ async function freshReload(page: Page) {
 	await expect(quickAdd(page)).toBeVisible();
 }
 
+test('bottom tab bar navigates between sections without Back', async ({ page }) => {
+	await expect(page.locator('nav.tabbar a[aria-current="page"]')).toHaveText(/List/);
+
+	await page.locator('nav.tabbar a', { hasText: 'Items' }).click();
+	await expect(page).toHaveURL(/\/catalog$/);
+	await expect(page.locator('nav.tabbar a[aria-current="page"]')).toHaveText(/Items/);
+
+	await page.locator('nav.tabbar a', { hasText: 'Recipes' }).click();
+	await expect(page).toHaveURL(/\/recipes$/);
+
+	await page.locator('nav.tabbar a', { hasText: 'List' }).click();
+	await expect(page).toHaveURL(/\/$/);
+});
+
+test('no tab bar on the login screen', async ({ page, context }) => {
+	await context.clearCookies();
+	await page.goto('/login');
+	await expect(page.locator('nav.tabbar')).toHaveCount(0);
+});
+
 test.beforeEach(async ({ page }) => {
 	await login(page);
 	await resetServer(page);
