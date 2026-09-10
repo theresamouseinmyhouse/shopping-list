@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { generateKeyBetween } from 'fractional-indexing';
 import { openDb, type DB, currentRev } from './db';
-import { applyOps, changesSince, resolvePlacement, resolveSectionOrder } from './sync';
+import { applyOps, changesSince, resolvePlacement } from './sync';
 import { GLOBAL, type Op, type OpInput } from '../types';
 
 let seq = 0;
@@ -42,14 +42,35 @@ describe('add_item', () => {
 
 	it('re-adding a removed item keeps its remembered placement (does not move to end)', () => {
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'i1', name: 'Milk', position: KA }));
-		apply(op({ type: 'move_item', item_id: 'i1', scope_place_id: GLOBAL, section_id: 's1', position: KC }));
+		apply(op({ type: 'move_item', item_id: 'i1', scope_place_id: GLOBAL, position: KC }));
 		apply(op({ type: 'remove_from_list', item_id: 'i1' }));
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'i1', name: 'Milk', position: KMID }));
-		const p = resolvePlacement(db, 'i1', GLOBAL);
-		expect(p).toMatchObject({ section_id: 's1', position: KC });
+		expect(resolvePlacement(db, 'i1', GLOBAL).position).toBe(KC);
 		const ls = changesSince(db, 0).list_state.find((r) => r.item_id === 'i1')!;
 		expect(ls.on_list).toBe(1);
 		expect(ls.checked).toBe(0);
+	});
+
+	it('re-adding from "All" keeps the item\'s home store and per-store spot', () => {
+		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'ps', name: 'Pumpkin seeds', position: KA }));
+		apply(op({ type: 'set_item_scope', item_id: 'ps', scope_place_id: 'lg' }));
+		apply(op({ type: 'move_item', item_id: 'ps', scope_place_id: 'lg', position: KC }));
+		apply(op({ type: 'set_check', item_id: 'ps', checked: true }));
+		apply(op({ type: 'clear_checked' }));
+		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'ps2', name: 'pumpkin seeds', position: KMID }));
+		const ls = changesSince(db, 0).list_state.find((r) => r.item_id === 'ps')!;
+		expect(ls.on_list).toBe(1);
+		expect(ls.scope_place_id).toBe('lg'); // home store remembered
+		expect(resolvePlacement(db, 'ps', 'lg').position).toBe(KC); // spot remembered
+	});
+
+	it('re-adding from inside a store (re)homes the item there', () => {
+		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'ps', name: 'Pumpkin seeds', position: KA }));
+		apply(op({ type: 'set_item_scope', item_id: 'ps', scope_place_id: 'lg' }));
+		apply(op({ type: 'remove_from_list', item_id: 'ps' }));
+		apply(op({ type: 'add_item', scope_place_id: 'costco', item_id: 'ps', name: 'Pumpkin seeds', position: KB }));
+		const ls = changesSince(db, 0).list_state.find((r) => r.item_id === 'ps')!;
+		expect(ls.scope_place_id).toBe('costco');
 	});
 
 	it('a second add of the same normalized name reuses the existing catalog item', () => {
@@ -62,13 +83,18 @@ describe('add_item', () => {
 		expect(changesSince(db, 0).list_state.find((r) => r.item_id === 'i1')!.on_list).toBe(1);
 	});
 
-	const qtyOf = (id: string) =>
-		changesSince(db, 0).list_state.find((r) => r.item_id === id)!.qty;
+	it('adding while a place is selected gives the item a placement in that place', () => {
+		apply(op({ type: 'add_place', place_id: 'costco', name: 'Costco', position: KA }));
+		apply(op({ type: 'add_item', scope_place_id: 'costco', item_id: 'i1', name: 'Nails', position: KB }));
+		const pls = changesSince(db, 0).placements.filter((p) => p.item_id === 'i1');
+		expect(pls.map((p) => p.scope_place_id).sort()).toEqual(['', 'costco']);
+	});
+
+	const qtyOf = (id: string) => changesSince(db, 0).list_state.find((r) => r.item_id === id)!.qty;
 
 	it('adding "milk" then "4 milks" bumps quantity on one item, not a new row', () => {
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'm', name: 'milk', position: KA }));
 		expect(qtyOf('m')).toBe(1);
-		// "4 milks" -> client sends name 'milk', qty 4; server matches the plural too anyway
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'm2', name: 'milks', position: KB, qty: 4 }));
 		expect(changesSince(db, 0).items.filter((i) => !i.deleted_at)).toHaveLength(1);
 		expect(qtyOf('m')).toBe(5);
@@ -122,67 +148,22 @@ describe('placement resolution & per-place overrides', () => {
 	});
 
 	it('a place with no override inherits the global placement', () => {
-		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, section_id: 'dairy', position: KB }));
-		expect(resolvePlacement(db, 'soy', 'costco')).toMatchObject({ section_id: 'dairy', position: KB });
+		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, position: KB }));
+		expect(resolvePlacement(db, 'soy', 'costco').position).toBe(KB);
 	});
 
 	it('a per-place move creates an override that wins for that place only', () => {
-		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, section_id: 'dairy', position: KB }));
-		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: 'costco', section_id: 'cooler', position: KC }));
-		expect(resolvePlacement(db, 'soy', 'costco')).toMatchObject({ section_id: 'cooler', position: KC });
-		expect(resolvePlacement(db, 'soy', GLOBAL)).toMatchObject({ section_id: 'dairy', position: KB });
+		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, position: KB }));
+		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: 'costco', position: KC }));
+		expect(resolvePlacement(db, 'soy', 'costco').position).toBe(KC);
+		expect(resolvePlacement(db, 'soy', GLOBAL).position).toBe(KB);
 	});
 
-	it('hide_item hides for one place only, inheriting section/position so it does not jump', () => {
-		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, section_id: 'dairy', position: KB }));
+	it('hide_item hides for one place only, inheriting position so it does not jump', () => {
+		apply(op({ type: 'move_item', item_id: 'soy', scope_place_id: GLOBAL, position: KB }));
 		apply(op({ type: 'hide_item', item_id: 'soy', scope_place_id: 'costco', hidden: true }));
-		expect(resolvePlacement(db, 'soy', 'costco')).toMatchObject({
-			hidden: 1,
-			section_id: 'dairy',
-			position: KB
-		});
+		expect(resolvePlacement(db, 'soy', 'costco')).toMatchObject({ hidden: 1, position: KB });
 		expect(resolvePlacement(db, 'soy', GLOBAL).hidden).toBe(0);
-	});
-});
-
-describe('sections & ordering', () => {
-	it('global section order is inherited by places and overridable per place', () => {
-		apply(
-			op({ type: 'add_place', place_id: 'ht', name: 'Harris Teeter', position: KA }),
-			op({ type: 'add_section', section_id: 'produce', name: 'Produce', place_id: GLOBAL, position: KA }),
-			op({ type: 'add_section', section_id: 'dairy', name: 'Dairy', place_id: GLOBAL, position: KB })
-		);
-		// global / no-place view
-		expect(resolveSectionOrder(db, GLOBAL).map((s) => s.section_id)).toEqual(['produce', 'dairy']);
-		// place inherits
-		expect(resolveSectionOrder(db, 'ht').map((s) => s.section_id)).toEqual(['produce', 'dairy']);
-		// reorder for the place only
-		apply(op({ type: 'move_section', scope_place_id: 'ht', section_id: 'dairy', position: generateKeyBetween(null, KA) }));
-		expect(resolveSectionOrder(db, 'ht').map((s) => s.section_id)).toEqual(['dairy', 'produce']);
-		expect(resolveSectionOrder(db, GLOBAL).map((s) => s.section_id)).toEqual(['produce', 'dairy']);
-	});
-
-	it('a place-specific section only shows for that place', () => {
-		apply(
-			op({ type: 'add_place', place_id: 'costco', name: 'Costco', position: KA }),
-			op({ type: 'add_place', place_id: 'ht', name: 'HT', position: KB }),
-			op({ type: 'add_section', section_id: 'bulk', name: 'Bulk', place_id: 'costco', position: KA })
-		);
-		expect(resolveSectionOrder(db, 'costco').map((s) => s.section_id)).toEqual(['bulk']);
-		expect(resolveSectionOrder(db, 'ht')).toEqual([]);
-		expect(resolveSectionOrder(db, GLOBAL)).toEqual([]);
-	});
-
-	it('hide_section hides it in a place view; delete_section removes it everywhere', () => {
-		apply(
-			op({ type: 'add_place', place_id: 'ht', name: 'HT', position: KA }),
-			op({ type: 'add_section', section_id: 'pharmacy', name: 'Pharmacy', place_id: GLOBAL, position: KA })
-		);
-		apply(op({ type: 'hide_section', scope_place_id: 'ht', section_id: 'pharmacy', hidden: true }));
-		expect(resolveSectionOrder(db, 'ht')).toEqual([]);
-		expect(resolveSectionOrder(db, GLOBAL).map((s) => s.section_id)).toEqual(['pharmacy']);
-		apply(op({ type: 'delete_section', section_id: 'pharmacy' }));
-		expect(resolveSectionOrder(db, GLOBAL)).toEqual([]);
 	});
 });
 
@@ -201,20 +182,61 @@ describe('changesSince / cursor', () => {
 		apply(op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'a', name: 'A', position: KA }));
 		apply(op({ type: 'set_note', item_id: 'a', note: 'first' }));
 		apply(op({ type: 'set_note', item_id: 'a', note: 'second' }));
-		const item = changesSince(db, 0).items.find((i) => i.id === 'a')!;
-		expect(item.note).toBe('second');
+		expect(changesSince(db, 0).items.find((i) => i.id === 'a')!.note).toBe('second');
 	});
 });
 
 describe('delete_place', () => {
-	it('soft-deletes the place and its per-place overrides stop applying', () => {
+	it('soft-deletes the place', () => {
 		apply(
 			op({ type: 'add_place', place_id: 'costco', name: 'Costco', position: KA }),
 			op({ type: 'add_item', scope_place_id: GLOBAL, item_id: 'soy', name: 'Soy', position: KA }),
-			op({ type: 'move_item', item_id: 'soy', scope_place_id: 'costco', section_id: 'x', position: KB })
+			op({ type: 'move_item', item_id: 'soy', scope_place_id: 'costco', position: KB })
 		);
 		apply(op({ type: 'delete_place', place_id: 'costco' }));
-		const places = changesSince(db, 0).places;
-		expect(places.find((p) => p.id === 'costco')!.deleted_at).toBeTruthy();
+		expect(changesSince(db, 0).places.find((p) => p.id === 'costco')!.deleted_at).toBeTruthy();
+	});
+});
+
+describe('flatten migration', () => {
+	it('a fresh :memory: db has no sections tables and flat placements', () => {
+		expect(db.prepare(`SELECT 1 FROM pragma_table_info('placements') WHERE name='section_id'`).get()).toBeUndefined();
+		expect(db.prepare(`SELECT name FROM sqlite_master WHERE name IN ('sections','section_order')`).all()).toEqual([]);
+	});
+
+	it('on legacy data: ranks by (section order, position), unsectioned last, drops the tables', async () => {
+		const { tmpdir } = await import('os');
+		const { join } = await import('path');
+		const { unlinkSync } = await import('fs');
+		const Sqlite = (await import('better-sqlite3')).default;
+
+		const path = join(tmpdir(), `flat-${Date.now()}-${Math.random().toString(36).slice(2)}.db`);
+		const raw = new Sqlite(path);
+		raw.exec(`
+			CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+			INSERT INTO meta VALUES ('rev','100'),('password_hash','x');
+			CREATE TABLE schema_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);
+			CREATE TABLE items (id TEXT PRIMARY KEY, name TEXT, name_norm TEXT, note TEXT DEFAULT '', is_staple INTEGER DEFAULT 0, rev INTEGER, deleted_at INTEGER);
+			CREATE TABLE sections (id TEXT PRIMARY KEY, name TEXT, place_id TEXT DEFAULT '', rev INTEGER, deleted_at INTEGER);
+			CREATE TABLE section_order (scope_place_id TEXT DEFAULT '', section_id TEXT, position TEXT, hidden INTEGER DEFAULT 0, rev INTEGER, PRIMARY KEY (scope_place_id, section_id));
+			CREATE TABLE placements (item_id TEXT, scope_place_id TEXT DEFAULT '', section_id TEXT DEFAULT '', position TEXT, hidden INTEGER DEFAULT 0, rev INTEGER, PRIMARY KEY (item_id, scope_place_id));
+			CREATE TABLE recipes (id TEXT PRIMARY KEY);
+			CREATE TABLE item_aliases (alias_norm TEXT PRIMARY KEY, item_id TEXT, created_at INTEGER);
+			INSERT INTO sections VALUES ('produce','Produce','',1,NULL),('dairy','Dairy','',1,NULL);
+			INSERT INTO section_order VALUES ('','produce','a0',0,1),('','dairy','a1',0,1);
+			INSERT INTO placements VALUES
+				('milk','','dairy','a5',0,1), ('kale','','produce','a5',0,1), ('soap','','','a0',0,1);
+		`);
+		for (const n of ['0001_init', '0002_item_scope', '0003_checked_at', '0004_qty', '0005_recipes', '0006_recipe_ingredients', '0007_recipe_parse'])
+			raw.prepare(`INSERT INTO schema_migrations (name, applied_at) VALUES (?, 0)`).run(n);
+		raw.close();
+
+		const migrated = openDb(path);
+		expect(migrated.prepare(`SELECT name FROM sqlite_master WHERE name IN ('sections','section_order')`).all()).toEqual([]);
+		expect(
+			migrated.prepare(`SELECT item_id FROM placements WHERE scope_place_id='' ORDER BY position`).all().map((r) => (r as { item_id: string }).item_id)
+		).toEqual(['kale', 'milk', 'soap']);
+		migrated.close();
+		try { unlinkSync(path); } catch { /* wal */ }
 	});
 });

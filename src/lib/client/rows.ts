@@ -1,7 +1,7 @@
 // Client-side mirror of the server's row model + a compact optimistic `applyOp`
-// and the same placement/section resolution. The server (src/lib/server/sync.ts)
-// remains the source of truth; this just makes the UI feel instant and keeps
-// working offline. Server changes overwrite these rows on the next sync.
+// and the same placement resolution. The server (src/lib/server/sync.ts) remains
+// the source of truth; this just makes the UI feel instant and keeps working
+// offline. Server changes overwrite these rows on the next sync.
 
 import { nameVariants } from '$lib/quantity';
 import {
@@ -12,29 +12,22 @@ import {
 	type Op,
 	type PlaceRow,
 	type PlaceScope,
-	type PlacementRow,
-	type SectionOrderRow,
-	type SectionRow
+	type PlacementRow
 } from '$lib/types';
 
 export interface Rows {
 	places: Map<string, PlaceRow>;
-	sections: Map<string, SectionRow>;
-	sectionOrder: Map<string, SectionOrderRow>; // key soKey(scope, sectionId)
 	items: Map<string, ItemRow>;
 	listState: Map<string, ListStateRow>;
 	placements: Map<string, PlacementRow>; // key plKey(itemId, scope)
 }
 
 const SEP = ''; // unit separator — cannot occur in ids or the '' scope
-export const soKey = (scope: PlaceScope, sectionId: string) => `${scope}${SEP}${sectionId}`;
 export const plKey = (itemId: string, scope: PlaceScope) => `${itemId}${SEP}${scope}`;
 
 export function emptyRows(): Rows {
 	return {
 		places: new Map(),
-		sections: new Map(),
-		sectionOrder: new Map(),
 		items: new Map(),
 		listState: new Map(),
 		placements: new Map()
@@ -44,8 +37,6 @@ export function emptyRows(): Rows {
 export function cloneRows(r: Rows): Rows {
 	return {
 		places: new Map(r.places),
-		sections: new Map(r.sections),
-		sectionOrder: new Map(r.sectionOrder),
 		items: new Map(r.items),
 		listState: new Map(r.listState),
 		placements: new Map(r.placements)
@@ -80,38 +71,6 @@ export function applyOpToRows(r: Rows, op: Op): void {
 			if (p) p.deleted_at = op.ts;
 			break;
 		}
-		case 'add_section':
-			r.sections.set(op.section_id, {
-				id: op.section_id,
-				name: op.name.trim(),
-				place_id: op.place_id,
-				rev: 0,
-				deleted_at: null
-			});
-			r.sectionOrder.set(soKey(op.place_id, op.section_id), {
-				scope_place_id: op.place_id,
-				section_id: op.section_id,
-				position: op.position,
-				hidden: 0,
-				rev: 0
-			});
-			break;
-		case 'rename_section': {
-			const s = r.sections.get(op.section_id);
-			if (s) s.name = op.name.trim();
-			break;
-		}
-		case 'delete_section': {
-			const s = r.sections.get(op.section_id);
-			if (s) s.deleted_at = op.ts;
-			break;
-		}
-		case 'move_section':
-			upsertSO(r, op.scope_place_id, op.section_id, { position: op.position });
-			break;
-		case 'hide_section':
-			upsertSO(r, op.scope_place_id, op.section_id, { hidden: op.hidden ? 1 : 0 });
-			break;
 
 		case 'add_item': {
 			const norm = normalizeName(op.name);
@@ -143,24 +102,23 @@ export function applyOpToRows(r: Rows, op: Op): void {
 				checked_at: 0,
 				qty: prev?.on_list ? prev.qty + addQty : addQty,
 				added_at: op.ts,
-				scope_place_id: op.scope_place_id,
+				// re-adding from "All" keeps the remembered home store; adding from inside a store (re)homes it
+				scope_place_id: op.scope_place_id || prev?.scope_place_id || GLOBAL,
 				rev: 0
 			});
 			if (!r.placements.has(plKey(item.id, GLOBAL))) {
 				r.placements.set(plKey(item.id, GLOBAL), {
 					item_id: item.id,
 					scope_place_id: GLOBAL,
-					section_id: op.section_id ?? GLOBAL,
 					position: op.position,
 					hidden: 0,
 					rev: 0
 				});
 			}
-			if (op.section_id && op.scope_place_id !== GLOBAL) {
+			if (op.scope_place_id !== GLOBAL && !r.placements.has(plKey(item.id, op.scope_place_id))) {
 				r.placements.set(plKey(item.id, op.scope_place_id), {
 					item_id: item.id,
 					scope_place_id: op.scope_place_id,
-					section_id: op.section_id,
 					position: op.position,
 					hidden: 0,
 					rev: 0
@@ -238,13 +196,11 @@ export function applyOpToRows(r: Rows, op: Op): void {
 			const k = plKey(op.item_id, op.scope_place_id);
 			const ex = r.placements.get(k);
 			if (ex) {
-				ex.section_id = op.section_id;
 				ex.position = op.position;
 			} else {
 				r.placements.set(k, {
 					item_id: op.item_id,
 					scope_place_id: op.scope_place_id,
-					section_id: op.section_id,
 					position: op.position,
 					hidden: 0,
 					rev: 0
@@ -262,7 +218,6 @@ export function applyOpToRows(r: Rows, op: Op): void {
 				r.placements.set(k, {
 					item_id: op.item_id,
 					scope_place_id: op.scope_place_id,
-					section_id: base.section_id,
 					position: base.position ?? 'a0',
 					hidden: op.hidden ? 1 : 0,
 					rev: 0
@@ -273,33 +228,9 @@ export function applyOpToRows(r: Rows, op: Op): void {
 	}
 }
 
-function upsertSO(
-	r: Rows,
-	scope: PlaceScope,
-	sectionId: string,
-	patch: { position?: string; hidden?: 0 | 1 }
-): void {
-	const k = soKey(scope, sectionId);
-	const ex = r.sectionOrder.get(k);
-	if (ex) {
-		if (patch.position !== undefined) ex.position = patch.position;
-		if (patch.hidden !== undefined) ex.hidden = patch.hidden;
-	} else {
-		const global = r.sectionOrder.get(soKey(GLOBAL, sectionId));
-		r.sectionOrder.set(k, {
-			scope_place_id: scope,
-			section_id: sectionId,
-			position: patch.position ?? global?.position ?? 'a0',
-			hidden: patch.hidden ?? 0,
-			rev: 0
-		});
-	}
-}
-
 // --- resolution (mirrors server) -----------------------------------------
 
 export interface ResolvedPlacement {
-	section_id: string;
 	position: string | null;
 	hidden: 0 | 1;
 }
@@ -307,71 +238,11 @@ export interface ResolvedPlacement {
 export function resolvePlacement(r: Rows, itemId: string, scope: PlaceScope): ResolvedPlacement {
 	const def = r.placements.get(plKey(itemId, GLOBAL));
 	if (scope === GLOBAL) {
-		return {
-			section_id: def?.section_id ?? GLOBAL,
-			position: def?.position ?? null,
-			hidden: def?.hidden ?? 0
-		};
+		return { position: def?.position ?? null, hidden: def?.hidden ?? 0 };
 	}
 	const ov = r.placements.get(plKey(itemId, scope));
 	return {
-		section_id: ov?.section_id ?? def?.section_id ?? GLOBAL,
 		position: ov?.position ?? def?.position ?? null,
 		hidden: ov ? ov.hidden : 0
 	};
-}
-
-export interface ResolvedSection {
-	section_id: string;
-	name: string;
-	position: string | null;
-	hidden: boolean;
-}
-
-const bySection = (a: ResolvedSection, b: ResolvedSection) =>
-	cmp(a.position, b.position) ||
-	a.name.localeCompare(b.name) ||
-	a.section_id.localeCompare(b.section_id);
-
-/** All sections applicable to a place view, split into visible (ordered) and hidden. */
-export function resolveSections(
-	r: Rows,
-	scope: PlaceScope
-): { visible: ResolvedSection[]; hidden: ResolvedSection[] } {
-	const all: ResolvedSection[] = [];
-	for (const sec of r.sections.values()) {
-		if (sec.deleted_at) continue;
-		if (sec.place_id !== GLOBAL && sec.place_id !== scope) continue;
-		const scoped = scope === GLOBAL ? undefined : r.sectionOrder.get(soKey(scope, sec.id));
-		const global = r.sectionOrder.get(soKey(GLOBAL, sec.id));
-		const eff = scoped ?? global;
-		all.push({
-			section_id: sec.id,
-			name: sec.name,
-			position: eff?.position ?? null,
-			hidden: eff ? !!eff.hidden : false
-		});
-	}
-	return {
-		visible: all.filter((s) => !s.hidden).sort(bySection),
-		hidden: all.filter((s) => s.hidden).sort(bySection)
-	};
-}
-
-export function resolveSectionOrder(r: Rows, scope: PlaceScope): ResolvedSection[] {
-	return resolveSections(r, scope).visible;
-}
-
-/** Effective hidden state of a section in a place view (place-row wins, else the default row). */
-export function sectionHiddenIn(r: Rows, sectionId: string, scope: PlaceScope): boolean {
-	const scoped = scope === GLOBAL ? undefined : r.sectionOrder.get(soKey(scope, sectionId));
-	const eff = scoped ?? r.sectionOrder.get(soKey(GLOBAL, sectionId));
-	return eff ? !!eff.hidden : false;
-}
-
-function cmp(a: string | null, b: string | null): number {
-	if (a === b) return 0;
-	if (a === null) return 1;
-	if (b === null) return -1;
-	return a < b ? -1 : 1;
 }

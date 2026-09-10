@@ -1,13 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type {
-	PlaceRow,
-	SectionRow,
-	SectionOrderRow,
-	ItemRow,
-	ListStateRow,
-	PlacementRow,
-	Op
-} from '$lib/types';
+import type { PlaceRow, ItemRow, ListStateRow, PlacementRow, Op } from '$lib/types';
 
 export interface OutboxRow {
 	id: string; // op id
@@ -21,8 +13,6 @@ export interface KV {
 
 class ListDB extends Dexie {
 	places!: Table<PlaceRow, string>;
-	sections!: Table<SectionRow, string>;
-	section_order!: Table<SectionOrderRow, [string, string]>;
 	items!: Table<ItemRow, string>;
 	list_state!: Table<ListStateRow, string>;
 	placements!: Table<PlacementRow, [string, string]>;
@@ -41,6 +31,14 @@ class ListDB extends Dexie {
 			outbox: 'id, created',
 			kv: 'key'
 		});
+		// v2: sections removed — one flat list per place. Drop the caches and force a
+		// full re-pull of placements (their positions changed server-side).
+		this.version(2)
+			.stores({ sections: null, section_order: null })
+			.upgrade(async (tx) => {
+				await tx.table('placements').clear();
+				await tx.table('kv').put({ key: 'cursor', value: '0' });
+			});
 	}
 }
 

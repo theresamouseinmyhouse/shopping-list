@@ -1,5 +1,5 @@
 import { GLOBAL, type PlaceRow, type PlaceScope } from '$lib/types';
-import { resolvePlacement, resolveSections, type Rows, type ResolvedSection } from './rows';
+import { resolvePlacement, type Rows } from './rows';
 
 export interface ItemView {
 	id: string;
@@ -9,22 +9,20 @@ export interface ItemView {
 	hidden: boolean;
 	is_staple: boolean;
 	qty: number;
-	scope_place_id: string; // '' = on every store's list; else pinned to that store
+	scope_place_id: string; // '' = not sorted into a store yet; else the item's home store
 	position: string | null;
 	added_at: number;
 }
-export interface SectionView {
-	section_id: string;
-	name: string;
+export interface ListGroup {
+	place: PlaceRow | null; // null = the "Not sorted yet" group
 	items: ItemView[];
 }
 export interface ListView {
 	places: PlaceRow[];
-	sections: SectionView[];
-	unsectioned: ItemView[];
+	items: ItemView[]; // the flat, drag-ordered list for a single-store view ([] in the All view)
+	groups: ListGroup[]; // per-store groups — populated only in the All view
 	checked: ItemView[];
-	hidden: ItemView[];
-	hiddenSections: ResolvedSection[];
+	hidden: ItemView[]; // on the master list but hidden at this store
 }
 
 function bySort(a: ItemView, b: ItemView): number {
@@ -41,52 +39,53 @@ export function buildView(rows: Rows, place: PlaceScope): ListView {
 		.filter((p) => !p.deleted_at)
 		.sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
 
-	const { visible: sections, hidden: hiddenSections } = resolveSections(rows, place);
-	const buckets = new Map<string, ItemView[]>(sections.map((s) => [s.section_id, []]));
-	const unsectioned: ItemView[] = [];
+	const flat: ItemView[] = []; // on the list, not checked, not hidden
 	const checked: ItemView[] = [];
 	const hidden: ItemView[] = [];
 
 	for (const ls of rows.listState.values()) {
 		if (!ls.on_list) continue;
-		// membership: '' = every place; otherwise only that place. The "All" view (place === '') shows everything.
-		if (place !== GLOBAL && ls.scope_place_id !== GLOBAL && ls.scope_place_id !== place) continue;
+		const home = ls.scope_place_id || GLOBAL;
+		// membership: '' = every place; otherwise only that place. "All" (place === '') shows everything.
+		if (place !== GLOBAL && home !== GLOBAL && home !== place) continue;
 		const item = rows.items.get(ls.item_id);
 		if (!item || item.deleted_at) continue;
-		const p = resolvePlacement(rows, ls.item_id, place);
+		// All view: order each item by its spot in its home store's list.
+		// Single-store view: order by this store's list.
+		const orderAt = place === GLOBAL ? home : place;
+		const position = resolvePlacement(rows, ls.item_id, orderAt).position;
+		// hiding is a per-store flag and only meaningful inside a store view
+		const isHidden = place === GLOBAL ? false : !!resolvePlacement(rows, ls.item_id, place).hidden;
 		const iv: ItemView = {
 			id: item.id,
 			name: item.name,
 			note: item.note,
 			checked: !!ls.checked,
-			hidden: !!p.hidden,
+			hidden: isHidden,
 			is_staple: !!item.is_staple,
 			qty: ls.qty || 1,
-			scope_place_id: ls.scope_place_id || GLOBAL,
-			position: p.position,
+			scope_place_id: home,
+			position,
 			added_at: ls.added_at
 		};
 		if (iv.checked) checked.push(iv);
 		else if (iv.hidden) hidden.push(iv);
-		else if (p.section_id !== GLOBAL && buckets.has(p.section_id)) buckets.get(p.section_id)!.push(iv);
-		else unsectioned.push(iv);
+		else flat.push(iv);
 	}
 
-	for (const arr of buckets.values()) arr.sort(bySort);
-	unsectioned.sort(bySort);
+	flat.sort(bySort);
 	checked.sort(bySort);
 	hidden.sort(bySort);
 
-	return {
-		places,
-		sections: sections.map((s) => ({
-			section_id: s.section_id,
-			name: s.name,
-			items: buckets.get(s.section_id) ?? []
-		})),
-		unsectioned,
-		checked,
-		hidden,
-		hiddenSections
-	};
+	if (place !== GLOBAL) {
+		return { places, items: flat, groups: [], checked, hidden };
+	}
+
+	const groups: ListGroup[] = places.map((p) => ({
+		place: p,
+		items: flat.filter((i) => i.scope_place_id === p.id)
+	}));
+	groups.push({ place: null, items: flat.filter((i) => i.scope_place_id === GLOBAL) });
+
+	return { places, items: [], groups, checked, hidden };
 }

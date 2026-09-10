@@ -13,41 +13,27 @@ async function resetServer(page: Page) {
 
 const quickAdd = (page: Page) => page.locator('.quickadd input');
 const item = (page: Page, name: string): Locator => page.locator(`li[data-name="${name}"]`);
+const listOrder = (page: Page) => page.locator('.list li[data-name]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.name));
+/** a row inside a named store's group in the All view */
+const inGroup = (page: Page, storeName: string, itemName: string): Locator =>
+	page.locator(`.group:has(.gname:text-is("${storeName}")) li[data-name="${itemName}"]`);
 
 async function addItem(page: Page, name: string) {
 	await quickAdd(page).fill(name);
 	await quickAdd(page).press('Enter');
 	await expect(item(page, name)).toBeVisible();
 }
-async function addItemInSection(page: Page, name: string, section: string) {
-	const inp = page.locator(`section[data-zone]:has(h2:has-text("${section}")) .additem input`);
-	await inp.fill(name);
-	await inp.press('Enter');
-	await expect(item(page, name)).toBeVisible();
-}
-async function setArrange(page: Page, on: boolean) {
-	const btn = page.locator('.topbar nav button');
-	const label = await btn.textContent();
-	if ((label?.trim() === 'Arrange') === on) await btn.click();
-}
-async function addSection(page: Page, name: string) {
-	await setArrange(page, true);
-	await page.fill('.addsection input', name);
-	await page.press('.addsection input', 'Enter');
-	await expect(page.locator(`h2:has-text("${name}")`)).toBeVisible();
-}
 async function check(page: Page, name: string) {
-	await item(page, name).locator('.main').click();
+	await item(page, name).locator('.check').click();
 }
 async function openRow(page: Page, name: string) {
 	await item(page, name).locator('.chev').click();
 }
 
-/** SortableJS-friendly drag by the grip handle (needs Arrange mode on). */
-async function drag(page: Page, name: string, targetSelector: string) {
-	await setArrange(page, true);
+/** SortableJS-friendly drag of one row's grip handle onto another row (handles are always visible). */
+async function drag(page: Page, name: string, targetName: string) {
 	const handle = item(page, name).locator('.item-handle');
-	const dst = page.locator(targetSelector).first();
+	const dst = item(page, targetName);
 	const s = await handle.boundingBox();
 	const d = await dst.boundingBox();
 	if (!s || !d) throw new Error('missing boxes');
@@ -72,8 +58,6 @@ async function freshReload(page: Page) {
 	await expect(quickAdd(page)).toBeVisible();
 }
 
-const sectionZone = (name: string) => `section[data-zone]:has(h2:has-text("${name}")) ul`;
-
 test.beforeEach(async ({ page }) => {
 	await login(page);
 	await resetServer(page);
@@ -85,16 +69,31 @@ test.beforeEach(async ({ page }) => {
 	await expect(quickAdd(page)).toBeVisible();
 });
 
-test('adds items to the end, then drag into a section persists per place', async ({ page }) => {
+test('new items land at the top; drag reorders and persists', async ({ page }) => {
 	await addItem(page, 'Milk');
 	await addItem(page, 'Bananas');
-	await addSection(page, 'Produce');
+	await addItem(page, 'Bread');
+	expect(await listOrder(page)).toEqual(['Bread', 'Bananas', 'Milk']); // newest first
 
-	await drag(page, 'Bananas', sectionZone('Produce'));
-	await expect(page.locator(sectionZone('Produce')).getByText('Bananas', { exact: true })).toBeVisible();
+	await drag(page, 'Bread', 'Milk'); // move Bread down past Milk
+	await expect.poll(() => listOrder(page)).toEqual(['Bananas', 'Milk', 'Bread']);
 
 	await freshReload(page);
-	await expect(page.locator(sectionZone('Produce')).getByText('Bananas', { exact: true })).toBeVisible();
+	expect(await listOrder(page)).toEqual(['Bananas', 'Milk', 'Bread']);
+});
+
+test('a per-store order does not change the item in the All view', async ({ page }) => {
+	await addItem(page, 'Rice');
+	await addItem(page, 'Beans');
+	page.once('dialog', (d) => d.accept('Costco'));
+	await page.click('button.chip.add');
+	await page.click('button.chip:has-text("Costco")');
+
+	await drag(page, 'Rice', 'Beans'); // Rice after Beans, at Costco only
+	await expect.poll(() => listOrder(page)).toEqual(['Beans', 'Rice']);
+
+	await page.click('button.chip:has-text("All")');
+	expect(await listOrder(page)).toEqual(['Beans', 'Rice']); // All still by the default order (newest-first: Beans, Rice)
 });
 
 test('an item added inside a store only appears there (and in All)', async ({ page }) => {
@@ -117,23 +116,45 @@ test('an item added inside a store only appears there (and in All)', async ({ pa
 	await expect(item(page, 'Nails')).toBeVisible();
 });
 
-test('a section hidden for a store can be un-hidden', async ({ page }) => {
-	await addSection(page, 'Pharmacy');
+test('All view: dragging an item into a store group sorts it there and pins it', async ({ page }) => {
+	await addItem(page, 'Ketchup'); // loose — "Not sorted yet"
 	page.once('dialog', (d) => d.accept('Costco'));
 	await page.click('button.chip.add');
 	await page.click('button.chip:has-text("Costco")');
+	await addItem(page, 'Paper Towels'); // pinned to Costco
+	await page.click('button.chip:has-text("All")');
 
-	await setArrange(page, true);
-	await page.click('section[data-zone]:has(h2:has-text("Pharmacy")) button[title="Hide this section here"]');
-	await expect(page.locator('h2:has-text("Pharmacy")')).toHaveCount(0);
-	await expect(page.locator('h2:has-text("Hidden sections here")')).toBeVisible();
+	await expect(inGroup(page, 'Costco', 'Paper Towels')).toBeVisible();
+	await drag(page, 'Ketchup', 'Paper Towels'); // drop into the Costco group
+	await expect(inGroup(page, 'Costco', 'Ketchup')).toBeVisible();
 
-	await page.click('button.unhide:has-text("Pharmacy")');
-	await expect(page.locator('h2:has-text("Pharmacy")')).toBeVisible();
+	await freshReload(page);
+	await expect(inGroup(page, 'Costco', 'Ketchup')).toBeVisible();
+	await page.click('button.chip:has-text("Costco")');
+	expect(await listOrder(page)).toContain('Ketchup'); // now on Costco's own list
+});
+
+test('checking off and clearing a store item, then re-adding from All, keeps its store', async ({ page }) => {
+	await addItem(page, 'Pepitas');
+	page.once('dialog', (d) => d.accept('Local Grocery'));
+	await page.click('button.chip.add');
+	await page.click('button.chip:has-text("Local Grocery")');
+	await addItem(page, 'Anchor'); // a second row to drop onto
+	await page.click('button.chip:has-text("All")');
+
+	await drag(page, 'Pepitas', 'Anchor'); // Pepitas -> Local Grocery group
+	await expect(inGroup(page, 'Local Grocery', 'Pepitas')).toBeVisible();
+
+	await check(page, 'Pepitas');
+	await page.click('h2:has-text("Checked") button:has-text("Clear")');
+	await expect(item(page, 'Pepitas')).toHaveCount(0);
+
+	await addItem(page, 'Pepitas'); // re-add from the All view
+	await expect(inGroup(page, 'Local Grocery', 'Pepitas')).toBeVisible();
 });
 
 test('"only show here" pins an item to the current store', async ({ page }) => {
-	await addItem(page, 'Bulk Rice'); // added from All -> everywhere
+	await addItem(page, 'Bulk Rice');
 	page.once('dialog', (d) => d.accept('Costco'));
 	await page.click('button.chip.add');
 	page.once('dialog', (d) => d.accept('Corner Store'));
@@ -148,7 +169,6 @@ test('"only show here" pins an item to the current store', async ({ page }) => {
 	await page.click('button.chip:has-text("Costco")');
 	await expect(item(page, 'Bulk Rice')).toBeVisible();
 
-	// release it back to everywhere
 	await openRow(page, 'Bulk Rice');
 	await item(page, 'Bulk Rice').getByRole('button', { name: 'Show at every store' }).click();
 	await page.click('button.chip:has-text("Corner Store")');
@@ -163,62 +183,26 @@ test('hide an item for one store only', async ({ page }) => {
 
 	await openRow(page, 'Soy Milk');
 	await item(page, 'Soy Milk').getByRole('button', { name: 'Hide here' }).click();
-	await expect(page.locator('h2:has-text("Hidden here")')).toBeVisible();
+	await expect(page.locator('h2:has-text("Not carried here")')).toBeVisible();
 
 	await page.click('button.chip:has-text("All")');
-	await expect(page.locator('h2:has-text("Hidden here")')).toHaveCount(0);
+	await expect(page.locator('h2:has-text("Not carried here")')).toHaveCount(0);
 });
 
-test('check off then clear removes from list but remembers placement', async ({ page }) => {
-	await addItem(page, 'Eggs');
-	await addSection(page, 'Dairy');
-	await drag(page, 'Eggs', sectionZone('Dairy'));
-	await setArrange(page, false);
+test('check off then clear removes from list but remembers position', async ({ page }) => {
+	await addItem(page, 'Apples');
+	await addItem(page, 'Flour');
+	await addItem(page, 'Eggs'); // newest-first: Eggs, Flour, Apples
+	await drag(page, 'Eggs', 'Apples'); // Eggs -> last
+	await expect.poll(() => listOrder(page)).toEqual(['Flour', 'Apples', 'Eggs']);
 
 	await check(page, 'Eggs');
 	await expect(page.locator('h2:has-text("Checked")')).toBeVisible();
 	await page.click('h2:has-text("Checked") button:has-text("Clear")');
 	await expect(item(page, 'Eggs')).toHaveCount(0);
 
-	await addItem(page, 'Eggs');
-	await expect(page.locator(sectionZone('Dairy')).getByText('Eggs', { exact: true })).toBeVisible();
-});
-
-test('Sections screen: multi-store visibility, rename, delete', async ({ page }) => {
-	page.once('dialog', (d) => d.accept('Costco'));
-	await page.click('button.chip.add');
-	page.once('dialog', (d) => d.accept('Fred Meyer'));
-	await page.click('button.chip.add');
-
-	await page.click('a[href="/sections"]');
-	await page.fill('.add input', 'Dairy');
-	await page.press('.add input', 'Enter');
-	await expect(page.getByRole('button', { name: 'Dairy' })).toBeVisible();
-	const id = await page
-		.locator('.sec')
-		.filter({ has: page.getByRole('button', { name: 'Dairy' }) })
-		.getAttribute('data-id');
-	const dairy = page.locator(`.sec[data-id="${id}"]`);
-
-	await expect(dairy.locator('.store:has-text("Costco")')).toHaveClass(/on/);
-	await dairy.locator('.store:has-text("Costco")').click();
-	await expect(dairy.locator('.store:has-text("Costco")')).not.toHaveClass(/on/);
-
-	await page.click('a[href="/"]');
-	await page.click('button.chip:has-text("Fred Meyer")');
-	await expect(page.locator('h2:has-text("Dairy")')).toBeVisible();
-	await page.click('button.chip:has-text("Costco")');
-	await expect(page.locator('h2:has-text("Dairy")')).toHaveCount(0);
-
-	await page.click('a[href="/sections"]');
-	const row = page.locator(`.sec[data-id="${id}"]`);
-	await row.locator('button.name').click();
-	await row.locator('input').fill('Cooler');
-	await row.locator('input').press('Enter');
-	await expect(page.getByRole('button', { name: 'Cooler' })).toBeVisible();
-	page.once('dialog', (d) => d.accept());
-	await row.locator('button[title="Delete section"]').click();
-	await expect(page.locator(`.sec[data-id="${id}"]`)).toHaveCount(0);
+	await addItem(page, 'Eggs'); // re-add -> remembered spot (last), not top
+	await expect.poll(() => listOrder(page)).toEqual(['Flour', 'Apples', 'Eggs']);
 });
 
 test('add-item autocomplete suggests catalog items by substring', async ({ page }) => {
@@ -275,15 +259,11 @@ test('Items screen: staples filter, edit, delete, add back to list', async ({ pa
 
 test('typing a quantity bumps one item, and the stepper adjusts it', async ({ page }) => {
 	await addItem(page, 'milk');
-	await expect(item(page, 'milk')).toBeVisible();
-
-	// "4 milks" -> still one "milk", quantity 5
 	await quickAdd(page).fill('4 milks');
 	await quickAdd(page).press('Enter');
 	await expect(item(page, 'milk').locator('.qty')).toHaveText('×5');
 	await expect(page.locator('li[data-id]')).toHaveCount(1);
 
-	// stepper in the options sheet
 	await openRow(page, 'milk');
 	await item(page, 'milk').getByRole('button', { name: 'Less' }).click();
 	await expect(item(page, 'milk').locator('.qty')).toHaveText('×4');
@@ -298,7 +278,6 @@ test('quick-add API endpoint adds an item; rejects a bad token', async ({ page, 
 	await page.reload();
 	await expect(item(page, 'From Voice')).toBeVisible();
 
-	// a fresh context with no session cookie -> bad token is rejected
 	const anon = await playwright.request.newContext({ baseURL });
 	const bad = await anon.post('/api/quick-add', {
 		headers: { authorization: 'Bearer wrong' },
@@ -313,17 +292,14 @@ test('setup endpoint refuses once a password is set; login page shows the sign-i
 	playwright,
 	baseURL
 }) => {
-	// the e2e server boots with LIST_PASSWORD set, so setup must be closed
 	const anon = await playwright.request.newContext({ baseURL });
 	const res = await anon.post('/api/setup', { data: { password: 'brand-new-password' } });
 	expect(res.status()).toBe(409);
 
-	// the refactored login path still works with the seeded password
 	const good = await anon.post('/api/login', { data: { password: 'e2e-pass' } });
 	expect(good.ok()).toBeTruthy();
 	await anon.dispose();
 
-	// logged out, the login page shows the sign-in form (not the create-password form)
 	await page.context().clearCookies();
 	await page.goto('/login');
 	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();

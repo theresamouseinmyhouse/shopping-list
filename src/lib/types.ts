@@ -3,8 +3,7 @@
 /**
  * The sentinel used everywhere a place is "not selected" / global / default.
  * SQLite composite primary keys do not dedupe NULLs, so we use '' instead of NULL
- * for the global scope in `sections.place_id`, `section_order.scope_place_id`,
- * `placements.scope_place_id`, and `placements.section_id` ("no section").
+ * for the global scope in `placements.scope_place_id`.
  */
 export const GLOBAL = '';
 
@@ -20,22 +19,6 @@ export interface PlaceRow {
 	position: string; // fractional index
 	rev: number;
 	deleted_at: number | null;
-}
-
-export interface SectionRow {
-	id: string;
-	name: string;
-	place_id: PlaceScope; // '' = global section
-	rev: number;
-	deleted_at: number | null;
-}
-
-export interface SectionOrderRow {
-	scope_place_id: PlaceScope; // '' = global/default order
-	section_id: string;
-	position: string;
-	hidden: 0 | 1;
-	rev: number;
 }
 
 export interface ItemRow {
@@ -62,31 +45,21 @@ export interface ListStateRow {
 
 export interface PlacementRow {
 	item_id: string;
-	scope_place_id: PlaceScope; // '' = default placement
-	section_id: string; // '' = no section
-	position: string;
-	hidden: 0 | 1;
+	scope_place_id: PlaceScope; // '' = default placement (inherited by every place)
+	position: string; // fractional index — the item's spot in this place's flat list
+	hidden: 0 | 1; // 1 = on the master list but not carried at this store
 	rev: number;
 }
 
 export interface ChangeSet {
 	cursor: number;
 	places: PlaceRow[];
-	sections: SectionRow[];
-	section_order: SectionOrderRow[];
 	items: ItemRow[];
 	list_state: ListStateRow[];
 	placements: PlacementRow[];
 }
 
-export const CHANGE_TABLES = [
-	'places',
-	'sections',
-	'section_order',
-	'items',
-	'list_state',
-	'placements'
-] as const;
+export const CHANGE_TABLES = ['places', 'items', 'list_state', 'placements'] as const;
 export type ChangeTable = (typeof CHANGE_TABLES)[number];
 
 // ---------------------------------------------------------------------------
@@ -105,11 +78,6 @@ export type Op = OpBase &
 		| { type: 'rename_place'; place_id: string; name: string }
 		| { type: 'delete_place'; place_id: string }
 		| { type: 'move_place'; place_id: string; position: string }
-		| { type: 'add_section'; section_id: string; name: string; place_id: PlaceScope; position: string }
-		| { type: 'rename_section'; section_id: string; name: string }
-		| { type: 'delete_section'; section_id: string }
-		| { type: 'move_section'; scope_place_id: PlaceScope; section_id: string; position: string }
-		| { type: 'hide_section'; scope_place_id: PlaceScope; section_id: string; hidden: boolean }
 		| {
 				type: 'add_item';
 				item_id: string;
@@ -118,8 +86,6 @@ export type Op = OpBase &
 				position: string;
 				/** the place the item is being added to; '' = the "All" list */
 				scope_place_id: PlaceScope;
-				/** optional: drop it straight into this section */
-				section_id?: string;
 				/** quantity to add; if the item is already on the list this is added to it (default 1) */
 				qty?: number;
 		  }
@@ -132,13 +98,7 @@ export type Op = OpBase &
 		| { type: 'remove_from_list'; item_id: string } // the trashcan: off the active list, catalog + placements kept
 		| { type: 'delete_item'; item_id: string } // hard delete from the catalog (v1.1 UI)
 		| { type: 'clear_checked' } // bulk: every checked item off the list
-		| {
-				type: 'move_item';
-				item_id: string;
-				scope_place_id: PlaceScope;
-				section_id: PlaceScope;
-				position: string;
-		  }
+		| { type: 'move_item'; item_id: string; scope_place_id: PlaceScope; position: string }
 		| { type: 'hide_item'; item_id: string; scope_place_id: PlaceScope; hidden: boolean }
 	);
 

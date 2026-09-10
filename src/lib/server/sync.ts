@@ -6,9 +6,7 @@ import {
 	type ChangeSet,
 	type Op,
 	type PlaceScope,
-	type PlacementRow,
-	type SectionOrderRow,
-	type SectionRow
+	type PlacementRow
 } from '../types';
 import { nameVariants } from '../quantity';
 
@@ -96,29 +94,6 @@ const handlers: Handlers = {
 		db.prepare(`UPDATE places SET position = ?, rev = ? WHERE id = ?`).run(op.position, rev, op.place_id);
 	},
 
-	add_section(db, op) {
-		const rev = nextRev(db);
-		db.prepare(
-			`INSERT INTO sections (id, name, place_id, rev, deleted_at) VALUES (?, ?, ?, ?, NULL)
-			 ON CONFLICT(id) DO UPDATE SET name = excluded.name, deleted_at = NULL, rev = excluded.rev`
-		).run(op.section_id, op.name.trim(), op.place_id, rev);
-		upsertSectionOrder(db, op.place_id, op.section_id, { position: op.position });
-	},
-	rename_section(db, op) {
-		const rev = nextRev(db);
-		db.prepare(`UPDATE sections SET name = ?, rev = ? WHERE id = ?`).run(op.name.trim(), rev, op.section_id);
-	},
-	delete_section(db, op) {
-		const rev = nextRev(db);
-		db.prepare(`UPDATE sections SET deleted_at = ?, rev = ? WHERE id = ?`).run(op.ts, rev, op.section_id);
-	},
-	move_section(db, op) {
-		upsertSectionOrder(db, op.scope_place_id, op.section_id, { position: op.position });
-	},
-	hide_section(db, op) {
-		upsertSectionOrder(db, op.scope_place_id, op.section_id, { hidden: op.hidden ? 1 : 0 });
-	},
-
 	add_item(db, op) {
 		const norm = normalizeName(op.name);
 		let row = db.prepare(`SELECT * FROM items WHERE id = ?`).get(op.item_id) as
@@ -144,15 +119,18 @@ const handlers: Handlers = {
 		const scope = op.scope_place_id;
 		const addQty = Math.max(1, Math.round(op.qty ?? 1));
 		const rev = nextRev(db);
-		const ls = db.prepare(`SELECT on_list, qty FROM list_state WHERE item_id = ?`).get(itemId) as
-			| { on_list: 0 | 1; qty: number }
-			| undefined;
+		const ls = db
+			.prepare(`SELECT on_list, qty, scope_place_id FROM list_state WHERE item_id = ?`)
+			.get(itemId) as { on_list: 0 | 1; qty: number; scope_place_id: string } | undefined;
 		if (ls) {
 			const qty = ls.on_list ? ls.qty + addQty : addQty;
+			// re-adding from "All" keeps the item's remembered home store; adding from
+			// inside a store (re)homes it there.
+			const nextScope = scope === GLOBAL ? ls.scope_place_id : scope;
 			db.prepare(
 				`UPDATE list_state SET on_list = 1, checked = 0, checked_at = 0, qty = ?, added_at = ?, scope_place_id = ?, rev = ?
 				 WHERE item_id = ?`
-			).run(qty, op.ts, scope, rev, itemId);
+			).run(qty, op.ts, nextScope, rev, itemId);
 		} else {
 			db.prepare(
 				`INSERT INTO list_state (item_id, on_list, checked, checked_at, qty, added_at, scope_place_id, rev)
@@ -160,24 +138,19 @@ const handlers: Handlers = {
 			).run(itemId, addQty, op.ts, scope, rev);
 		}
 
+		// default placement (scope '') — inherited by every place until dragged
 		if (!getPlacement(db, itemId, GLOBAL)) {
 			const prev = nextRev(db);
 			db.prepare(
-				`INSERT INTO placements (item_id, scope_place_id, section_id, position, hidden, rev)
-				 VALUES (?, ?, ?, ?, 0, ?)`
-			).run(itemId, GLOBAL, op.section_id ?? GLOBAL, op.position, prev);
+				`INSERT INTO placements (item_id, scope_place_id, position, hidden, rev) VALUES (?, ?, ?, 0, ?)`
+			).run(itemId, GLOBAL, op.position, prev);
 		}
-		// dropping straight into a section within a specific place -> per-place placement
-		if (op.section_id && scope !== GLOBAL) {
-			handlers.move_item(db, {
-				id: op.id,
-				ts: op.ts,
-				type: 'move_item',
-				item_id: itemId,
-				scope_place_id: scope,
-				section_id: op.section_id,
-				position: op.position
-			});
+		// added while a place was selected — give it a spot in that place's list too
+		if (scope !== GLOBAL && !getPlacement(db, itemId, scope)) {
+			const prev = nextRev(db);
+			db.prepare(
+				`INSERT INTO placements (item_id, scope_place_id, position, hidden, rev) VALUES (?, ?, ?, 0, ?)`
+			).run(itemId, scope, op.position, prev);
 		}
 	},
 	rename_item(db, op) {
@@ -254,14 +227,12 @@ const handlers: Handlers = {
 		const existing = getPlacement(db, op.item_id, op.scope_place_id);
 		if (existing) {
 			db.prepare(
-				`UPDATE placements SET section_id = ?, position = ?, rev = ?
-				 WHERE item_id = ? AND scope_place_id = ?`
-			).run(op.section_id, op.position, rev, op.item_id, op.scope_place_id);
+				`UPDATE placements SET position = ?, rev = ? WHERE item_id = ? AND scope_place_id = ?`
+			).run(op.position, rev, op.item_id, op.scope_place_id);
 		} else {
 			db.prepare(
-				`INSERT INTO placements (item_id, scope_place_id, section_id, position, hidden, rev)
-				 VALUES (?, ?, ?, ?, 0, ?)`
-			).run(op.item_id, op.scope_place_id, op.section_id, op.position, rev);
+				`INSERT INTO placements (item_id, scope_place_id, position, hidden, rev) VALUES (?, ?, ?, 0, ?)`
+			).run(op.item_id, op.scope_place_id, op.position, rev);
 		}
 	},
 	hide_item(db, op) {
@@ -274,46 +245,11 @@ const handlers: Handlers = {
 		} else {
 			const base = resolvePlacement(db, op.item_id, op.scope_place_id);
 			db.prepare(
-				`INSERT INTO placements (item_id, scope_place_id, section_id, position, hidden, rev)
-				 VALUES (?, ?, ?, ?, ?, ?)`
-			).run(
-				op.item_id,
-				op.scope_place_id,
-				base.section_id,
-				base.position ?? 'a0',
-				op.hidden ? 1 : 0,
-				rev
-			);
+				`INSERT INTO placements (item_id, scope_place_id, position, hidden, rev) VALUES (?, ?, ?, ?, ?)`
+			).run(op.item_id, op.scope_place_id, base.position ?? 'a0', op.hidden ? 1 : 0, rev);
 		}
 	}
 };
-
-function upsertSectionOrder(
-	db: DB,
-	scope: PlaceScope,
-	sectionId: string,
-	patch: { position?: string; hidden?: 0 | 1 }
-): void {
-	const rev = nextRev(db);
-	const existing = db
-		.prepare(`SELECT * FROM section_order WHERE scope_place_id = ? AND section_id = ?`)
-		.get(scope, sectionId) as SectionOrderRow | undefined;
-	if (existing) {
-		db.prepare(
-			`UPDATE section_order SET position = ?, hidden = ?, rev = ?
-			 WHERE scope_place_id = ? AND section_id = ?`
-		).run(patch.position ?? existing.position, patch.hidden ?? existing.hidden, rev, scope, sectionId);
-	} else {
-		// seed a fresh scope row from the global order row when only toggling `hidden`
-		const global = db
-			.prepare(`SELECT * FROM section_order WHERE scope_place_id = '' AND section_id = ?`)
-			.get(sectionId) as SectionOrderRow | undefined;
-		db.prepare(
-			`INSERT INTO section_order (scope_place_id, section_id, position, hidden, rev)
-			 VALUES (?, ?, ?, ?, ?)`
-		).run(scope, sectionId, patch.position ?? global?.position ?? 'a0', patch.hidden ?? 0, rev);
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Resolve (read models — pure functions of DB state)
@@ -322,7 +258,6 @@ function upsertSectionOrder(
 export interface ResolvedPlacement {
 	item_id: string;
 	scope_place_id: PlaceScope;
-	section_id: string;
 	position: string | null;
 	hidden: 0 | 1;
 }
@@ -334,7 +269,6 @@ export function resolvePlacement(db: DB, itemId: string, scope: PlaceScope): Res
 		return {
 			item_id: itemId,
 			scope_place_id: GLOBAL,
-			section_id: def?.section_id ?? GLOBAL,
 			position: def?.position ?? null,
 			hidden: def?.hidden ?? 0
 		};
@@ -343,57 +277,9 @@ export function resolvePlacement(db: DB, itemId: string, scope: PlaceScope): Res
 	return {
 		item_id: itemId,
 		scope_place_id: scope,
-		section_id: ov?.section_id ?? def?.section_id ?? GLOBAL,
 		position: ov?.position ?? def?.position ?? null,
 		hidden: ov ? ov.hidden : 0
 	};
-}
-
-export interface ResolvedSection {
-	section_id: string;
-	name: string;
-	position: string | null;
-	hidden: boolean;
-}
-
-/** Visible sections for a place view, in order. Hidden sections are omitted. */
-export function resolveSectionOrder(db: DB, scope: PlaceScope): ResolvedSection[] {
-	const sections = db
-		.prepare(
-			`SELECT * FROM sections WHERE deleted_at IS NULL AND (place_id = '' OR place_id = ?)`
-		)
-		.all(scope) as SectionRow[];
-
-	const orderRow = (s: PlaceScope, id: string) =>
-		db
-			.prepare(`SELECT * FROM section_order WHERE scope_place_id = ? AND section_id = ?`)
-			.get(s, id) as SectionOrderRow | undefined;
-
-	const out: ResolvedSection[] = [];
-	for (const sec of sections) {
-		const scoped = scope === GLOBAL ? undefined : orderRow(scope, sec.id);
-		const global = orderRow(GLOBAL, sec.id);
-		const eff = scoped ?? global;
-		out.push({
-			section_id: sec.id,
-			name: sec.name,
-			position: eff?.position ?? null,
-			hidden: eff ? !!eff.hidden : false
-		});
-	}
-	return out
-		.filter((s) => !s.hidden)
-		.sort(
-			(a, b) =>
-				cmp(a.position, b.position) || a.name.localeCompare(b.name) || a.section_id.localeCompare(b.section_id)
-		);
-}
-
-function cmp(a: string | null, b: string | null): number {
-	if (a === b) return 0;
-	if (a === null) return 1;
-	if (b === null) return -1;
-	return a < b ? -1 : 1;
 }
 
 // ---------------------------------------------------------------------------

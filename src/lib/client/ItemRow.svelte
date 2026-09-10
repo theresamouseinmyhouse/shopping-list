@@ -11,13 +11,11 @@
 		item,
 		place,
 		scopeName = '',
-		arrange = false,
 		editing = $bindable(false)
 	}: {
 		item: ItemView;
 		place: string;
 		scopeName?: string; // name of the store this item is pinned to, if any
-		arrange?: boolean;
 		editing?: boolean;
 	} = $props();
 
@@ -104,6 +102,7 @@
 
 <li class="row" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
 	<div class="rowline" style="transform: translateX({dx}px)" class:swiping>
+		<span class="handle item-handle" aria-hidden="true"><GripVertical size={18} /></span>
 		<button
 			class="check"
 			aria-label={item.checked ? `Uncheck ${item.name}` : `Check off ${item.name}`}
@@ -121,11 +120,6 @@
 			onpointerup={up}
 			onpointercancel={up}
 		>
-			{#if arrange}
-				<span class="handle item-handle" title="Drag to move" aria-hidden="true">
-					<GripVertical size={18} />
-				</span>
-			{/if}
 			<span class="label">
 				<span class="nm" class:struck={item.checked}>
 					{item.name}{#if item.qty > 1}<span class="qty">×{item.qty}</span>{/if}
@@ -218,7 +212,7 @@
 		place-items: center;
 		cursor: grab;
 		touch-action: none;
-		padding: 0.7rem 0.3rem;
+		padding: 0.7rem 0.15rem 0.7rem 0.4rem;
 		color: var(--muted);
 	}
 	.check {
@@ -235,7 +229,7 @@
 	.check .dot {
 		width: 1.6rem;
 		height: 1.6rem;
-		border: 2px solid var(--line);
+		border: 2px solid var(--check-line);
 		border-radius: 999px;
 		display: grid;
 		place-items: center;
@@ -290,7 +284,7 @@
 		flex-wrap: wrap;
 		gap: 0.5rem;
 		align-items: center;
-		padding: 0 0.6rem 0.7rem 2.7rem;
+		padding: 0 0.6rem 0.7rem 3.2rem;
 		background: var(--bg);
 	}
 	.edit input:not([type='checkbox']) {

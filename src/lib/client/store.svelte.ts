@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing';
 import { uuid } from './uuid';
 import { idb } from './idb';
-import { emptyRows, cloneRows, applyOpToRows, soKey, plKey, type Rows } from './rows';
+import { emptyRows, cloneRows, applyOpToRows, plKey, type Rows } from './rows';
 import { type ChangeSet, type Op, type OpInput, type PlaceScope } from '$lib/types';
 
 // --- non-reactive core; `ui.rev` is the single reactive signal ------------
@@ -134,9 +134,6 @@ export async function sync(): Promise<void> {
 
 function mergeChanges(cs: ChangeSet): void {
 	for (const p of cs.places) serverRows.places.set(p.id, p);
-	for (const s of cs.sections) serverRows.sections.set(s.id, s);
-	for (const s of cs.section_order)
-		serverRows.sectionOrder.set(soKey(s.scope_place_id, s.section_id), s);
 	for (const i of cs.items) serverRows.items.set(i.id, i);
 	for (const l of cs.list_state) serverRows.listState.set(l.item_id, l);
 	for (const pl of cs.placements)
@@ -144,10 +141,8 @@ function mergeChanges(cs: ChangeSet): void {
 }
 
 async function persist(cs: ChangeSet, ackedOpIds: string[]): Promise<void> {
-	await idb.transaction('rw', [idb.places, idb.sections, idb.section_order, idb.items, idb.list_state, idb.placements, idb.outbox, idb.kv], async () => {
+	await idb.transaction('rw', [idb.places, idb.items, idb.list_state, idb.placements, idb.outbox, idb.kv], async () => {
 		if (cs.places.length) await idb.places.bulkPut(cs.places);
-		if (cs.sections.length) await idb.sections.bulkPut(cs.sections);
-		if (cs.section_order.length) await idb.section_order.bulkPut(cs.section_order);
 		if (cs.items.length) await idb.items.bulkPut(cs.items);
 		if (cs.list_state.length) await idb.list_state.bulkPut(cs.list_state);
 		if (cs.placements.length) await idb.placements.bulkPut(cs.placements);
@@ -168,12 +163,10 @@ export async function boot(): Promise<void> {
 		/* private mode */
 	}
 
-	const [kvCursor, kvDevice, places, sections, so, items, ls, pl, ob] = await Promise.all([
+	const [kvCursor, kvDevice, places, items, ls, pl, ob] = await Promise.all([
 		idb.kv.get('cursor'),
 		idb.kv.get('deviceId'),
 		idb.places.toArray(),
-		idb.sections.toArray(),
-		idb.section_order.toArray(),
 		idb.items.toArray(),
 		idb.list_state.toArray(),
 		idb.placements.toArray(),
@@ -186,8 +179,6 @@ export async function boot(): Promise<void> {
 
 	serverRows = emptyRows();
 	for (const p of places) serverRows.places.set(p.id, p);
-	for (const s of sections) serverRows.sections.set(s.id, s);
-	for (const s of so) serverRows.sectionOrder.set(soKey(s.scope_place_id, s.section_id), s);
 	for (const i of items) serverRows.items.set(i.id, i);
 	for (const l of ls) serverRows.listState.set(l.item_id, l);
 	for (const p of pl) serverRows.placements.set(plKey(p.item_id, p.scope_place_id), p);
@@ -230,12 +221,10 @@ async function hardReset(): Promise<void> {
 	cursor = 0;
 	await idb.transaction(
 		'rw',
-		[idb.places, idb.sections, idb.section_order, idb.items, idb.list_state, idb.placements, idb.outbox, idb.kv],
+		[idb.places, idb.items, idb.list_state, idb.placements, idb.outbox, idb.kv],
 		async () => {
 			await Promise.all([
 				idb.places.clear(),
-				idb.sections.clear(),
-				idb.section_order.clear(),
 				idb.items.clear(),
 				idb.list_state.clear(),
 				idb.placements.clear(),

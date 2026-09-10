@@ -12,6 +12,7 @@
 		--text: #0f172a;
 		--muted: #64748b;
 		--line: #e2e8f0;
+		--check-line: #94a3b8;
 		--accent: #2563eb;
 		--danger: #dc2626;
 		color-scheme: light dark;
@@ -24,6 +25,7 @@
 			--text: #e5e7eb;
 			--muted: #94a3b8;
 			--line: #1f2a3c;
+			--check-line: #475569;
 			--accent: #3b82f6;
 			--danger: #f87171;
 		}

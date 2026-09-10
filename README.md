@@ -1,9 +1,12 @@
 # list
 
 A location-aware smart shopping list. One shared list; "places" (stores — grocery
-*and* non-grocery) are filtered views over it. Each item remembers its section,
-position and hidden flag **per place**, inheriting from a no-place default. Offline-
-capable PWA with sync. Two-person household, one shared password.
+*and* non-grocery) are filtered views over it. Each place is one flat, drag-ordered
+list — set it to match your walk through that store. The **All** view groups every
+item under its home store (drag a row between groups to re-home it) plus a "Not
+sorted yet" group. Every item remembers its position and hidden flag **per place**,
+inheriting from a no-place default. Offline-capable PWA with sync. Two-person
+household, one shared password.
 
 ## Stack
 
@@ -84,10 +87,13 @@ volume. Back it up. To update: `docker compose pull && docker compose up -d`, or
 - `items` — catalog of everything ever added (survives check-off).
 - `list_state` — which items are on the active list + checked status.
 - `places` — stores / lists. The "All" view is the empty scope `''`.
-- `sections` — aisles. Global (`place_id=''`) or place-specific.
-- `section_order` — per-scope ordering/visibility of sections.
-- `placements` — per-`(item, scope)` section + position + hidden. Scope `''` is the
-  default that places inherit.
+- `list_state.scope_place_id` — an item's **home store** (`''` = not sorted into a
+  store yet). Added while a store is selected → that store is its home and it shows
+  only there; added from "All" → home-less, shows everywhere. The All view groups by
+  this; dragging a row into another group re-homes it.
+- `placements` — per-`(item, scope)` `position` (fractional index — the item's spot
+  in that store's one flat, drag-ordered list) + `hidden` ("on the master list but
+  not carried at this store"). Scope `''` is the default every place inherits.
 - Every row carries `rev` (global monotonic counter); `/api/sync` returns rows with
   `rev > cursor`. Conflict policy: last-write-wins by `rev`.
 - `recipes` / `recipe_steps` / `recipe_ingredients` / `recipe_links` /
