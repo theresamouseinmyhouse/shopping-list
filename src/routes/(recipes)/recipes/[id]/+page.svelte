@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import Screen from '$lib/nav/Screen.svelte';
+	import Sheet from '$lib/nav/Sheet.svelte';
+	import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
 	import RecipeBody from '../../RecipeBody.svelte';
 	import { normalizeName } from '$lib/types';
 	import { parseQuantity, factorFromHave, formatQuantity } from '$lib/scale';
@@ -31,6 +34,9 @@
 	}
 
 	let picking = $state(false);
+	let menuOpen = $state(false);
+	let deleting = $state(false);
+
 	// which candidate names are ticked (all on by default)
 	let chosen = $state(
 		new Set(untrack(() => data.candidates).map((c) => normalizeName(c.name)))
@@ -49,35 +55,55 @@
 
 <svelte:head><title>{tree.title}</title></svelte:head>
 
-<div class="rec-topbar noprint">
-	<a class="rec-link" href="/recipes">‹ Recipes</a>
-	<span class="spacer"></span>
-	<a class="rec-btn" href={`/recipes/${tree.id}/edit`}>Edit</a>
-	<button class="rec-btn" onclick={() => window.print()}>Print</button>
-	<button
-		class="rec-btn primary"
-		onclick={() => (picking = !picking)}
-		disabled={!data.candidates.length}
-	>
-		Add to list
-	</button>
-	<form
-		method="POST"
-		action="?/delete"
-		style="display:contents"
-		onsubmit={(e) => {
-			if (!confirm(`Delete “${tree.title}”?`)) e.preventDefault();
-		}}
-	>
-		<button class="rec-btn danger">Delete</button>
-	</form>
-</div>
+<Screen title={tree.title} back="/recipes">
+	{#snippet actions()}
+		<button
+			class="btn btn-sm btn-primary"
+			onclick={() => (picking = true)}
+			disabled={!data.candidates.length}
+		>
+			Add to list
+		</button>
+		<button class="btn btn-sm" aria-label="More" onclick={() => (menuOpen = true)}>
+			<MoreHorizontal size={18} />
+		</button>
+	{/snippet}
 
-{#if picking}
+	{#if form?.added != null}
+		<p class="flash noprint">
+			{#if form.added}Added {form.added} item{form.added === 1 ? '' : 's'} to your list.{:else}Nothing selected.{/if}
+		</p>
+	{/if}
+
+	{#if tree.source_url}
+		<p class="src noprint"><a href={tree.source_url} target="_blank" rel="noreferrer">source</a></p>
+	{/if}
+
+	<div class="scalebar noprint">
+		<span class="lbl">Scale</span>
+		{#each PRESETS as p (p)}
+			<button class="sc" class:on={scale === p} onclick={() => (scale = p)}>
+				{p === 1 ? '1×' : `${formatQuantity(p)}×`}
+			</button>
+		{/each}
+		<button class="sc" class:on={haveOpen} onclick={() => (haveOpen = true)}>to what I have…</button>
+		{#if scale !== 1 && !PRESETS.includes(scale)}
+			<span class="cur">×{formatQuantity(scale)}</span>
+			<button class="sc" onclick={() => (scale = 1)}>reset</button>
+		{/if}
+	</div>
+
+	<article>
+		<RecipeBody recipe={tree} {scale} />
+	</article>
+</Screen>
+
+<!-- Add to list -->
+<Sheet open={picking} onClose={() => (picking = false)} title="Add to list">
 	<form
 		method="POST"
 		action="?/addToList"
-		class="picker noprint"
+		class="picker"
 		use:enhance={() =>
 			({ update }) => {
 				picking = false;
@@ -85,12 +111,11 @@
 			}}
 	>
 		<div class="pickhead">
-			<strong>Add to shopping list</strong>
+			<span class="hint">Untick what you already have.</span>
 			<span class="spacer"></span>
-			<button type="button" class="link" onclick={() => all(true)}>all</button>
-			<button type="button" class="link" onclick={() => all(false)}>none</button>
+			<button type="button" class="btn btn-plain btn-sm" onclick={() => all(true)}>all</button>
+			<button type="button" class="btn btn-plain btn-sm" onclick={() => all(false)}>none</button>
 		</div>
-		<p class="hint">Untick what you already have.</p>
 		<ul>
 			{#each data.candidates as c (c.name)}
 				<li>
@@ -108,87 +133,63 @@
 				</li>
 			{/each}
 		</ul>
-		<div class="pickactions">
-			<button type="button" class="rec-btn" onclick={() => (picking = false)}>Cancel</button>
-			<button class="rec-btn primary" disabled={count === 0}>
-				Add {count} item{count === 1 ? '' : 's'}
-			</button>
-		</div>
-	</form>
-{/if}
-
-{#if form?.added != null}
-	<p class="flash noprint">
-		{#if form.added}Added {form.added} item{form.added === 1 ? '' : 's'} to your list.{:else}Nothing selected.{/if}
-	</p>
-{/if}
-
-{#if tree.source_url}
-	<p class="src noprint"><a href={tree.source_url} target="_blank" rel="noreferrer">source</a></p>
-{/if}
-
-<div class="scalebar noprint">
-	<span class="lbl">Scale</span>
-	{#each PRESETS as p (p)}
-		<button class="sc" class:on={scale === p} onclick={() => (scale = p)}>
-			{p === 1 ? '1×' : `${formatQuantity(p)}×`}
+		<button class="btn btn-primary" type="submit" disabled={count === 0}>
+			Add {count} item{count === 1 ? '' : 's'}
 		</button>
-	{/each}
-	<button class="sc" class:on={haveOpen} onclick={() => (haveOpen = !haveOpen)}>to what I have…</button>
-	{#if scale !== 1 && !PRESETS.includes(scale)}
-		<span class="cur">×{formatQuantity(scale)}</span>
-		<button class="sc" onclick={() => (scale = 1)}>reset</button>
-	{/if}
-</div>
+	</form>
+	{#snippet foot()}
+		<button class="btn" type="button" onclick={() => (picking = false)}>Cancel</button>
+	{/snippet}
+</Sheet>
 
-{#if haveOpen}
-	<div class="havebox noprint">
-		<p class="hint">Pick an ingredient and say how much you have — everything scales to match.</p>
-		<div class="haverow">
-			<select bind:value={haveId}>
-				<option value="">ingredient…</option>
-				{#each scalable as i (i.id)}
-					<option value={i.id}>{formatAmount(i.quantity, i.unit)} {i.name}</option>
-				{/each}
-			</select>
-			<span class="eq">I have</span>
-			<input type="number" min="0" step="any" bind:value={haveAmt} placeholder="0" />
-			<span class="unit">{scalable.find((i) => i.id === haveId)?.unit || ''}</span>
-			<button class="rec-btn primary" onclick={applyHave}>Scale</button>
-		</div>
-		<p class="hint dim">Rough guide only — spices, salt and leavening often need a human eye.</p>
-	</div>
-{/if}
+<!-- Scale to what I have -->
+<Sheet open={haveOpen} onClose={() => (haveOpen = false)} title="Scale to what I have">
+	<p class="hint">Pick an ingredient and say how much you have — everything scales to match.</p>
+	<select class="field" bind:value={haveId}>
+		<option value="">ingredient…</option>
+		{#each scalable as i (i.id)}
+			<option value={i.id}>{formatAmount(i.quantity, i.unit)} {i.name}</option>
+		{/each}
+	</select>
+	<input class="field" type="number" min="0" step="any" bind:value={haveAmt} placeholder="0" />
+	<button class="btn btn-primary" onclick={applyHave} disabled={!haveId || !Number(haveAmt)}>Apply</button>
+	<p class="hint dim">Rough guide only — spices, salt and leavening often need a human eye.</p>
+	{#snippet foot()}
+		<button class="btn" type="button" onclick={() => (haveOpen = false)}>Cancel</button>
+	{/snippet}
+</Sheet>
 
-<article>
-	<RecipeBody recipe={tree} {scale} />
-</article>
+<!-- ⋯ menu -->
+<Sheet open={menuOpen} onClose={() => (menuOpen = false)} title={tree.title}>
+	<a class="btn" href={`/recipes/${tree.id}/edit`}>Edit</a>
+	<button class="btn" onclick={() => { menuOpen = false; window.print(); }}>Print</button>
+	<button class="btn btn-danger" onclick={() => { menuOpen = false; deleting = true; }}>Delete</button>
+</Sheet>
+
+<!-- Delete confirm -->
+<Sheet open={deleting} onClose={() => (deleting = false)} title={`Delete ${tree.title}?`}>
+	<p class="hint">This can't be undone.</p>
+	<form method="POST" action="?/delete">
+		<button class="btn btn-danger" type="submit">Delete</button>
+	</form>
+	{#snippet foot()}
+		<button class="btn" type="button" onclick={() => (deleting = false)}>Cancel</button>
+	{/snippet}
+</Sheet>
 
 <style>
-	.picker {
-		border: 1px solid var(--line);
-		border-radius: 0.6rem;
-		padding: 0.7rem;
-		margin: 0.5rem 0;
+	.spacer {
+		flex: 1;
+	}
+	.hint {
+		margin: 0.2rem 0 0.5rem;
+		font-size: 0.8rem;
+		color: var(--text-2);
 	}
 	.pickhead {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-	.spacer {
-		flex: 1;
-	}
-	.link {
-		background: none;
-		border: 0;
-		color: var(--accent);
-		font-size: 0.85rem;
-	}
-	.hint {
-		margin: 0.2rem 0 0.5rem;
-		font-size: 0.8rem;
-		color: var(--muted);
 	}
 	.picker ul {
 		list-style: none;
@@ -205,31 +206,27 @@
 		padding: 0.35rem 0.2rem;
 		font-size: 0.92rem;
 	}
+	.picker button[type='submit'] {
+		width: 100%;
+		margin-top: 0.6rem;
+	}
 	.known {
 		font-size: 0.72rem;
-		color: var(--muted);
+		color: var(--text-3);
 		border: 1px solid var(--line);
 		border-radius: 999px;
 		padding: 0 0.4rem;
-	}
-	.pickactions {
-		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.6rem;
-	}
-	.pickactions .primary {
-		flex: 1;
 	}
 	.flash {
 		background: var(--surface-2);
 		border-radius: 0.5rem;
 		padding: 0.5rem 0.7rem;
 		font-size: 0.9rem;
-		margin: 0.4rem 0;
+		margin: 0.4rem 0.7rem;
 	}
 	.src {
 		font-size: 0.8rem;
-		margin: 0.2rem 0;
+		margin: 0.2rem 0.7rem;
 	}
 	.scalebar {
 		display: flex;
@@ -237,14 +234,15 @@
 		align-items: center;
 		gap: 0.35rem;
 		margin: 0.5rem 0 0.2rem;
+		padding: 0 0.7rem;
 	}
 	.scalebar .lbl {
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 		margin-right: 0.1rem;
 	}
 	.sc {
-		background: var(--surface);
+		background: var(--surface-1);
 		border: 1px solid var(--line);
 		border-radius: 0.5rem;
 		padding: 0.25rem 0.55rem;
@@ -261,41 +259,16 @@
 		color: var(--accent);
 		font-weight: 600;
 	}
-	.havebox {
-		border: 1px solid var(--line);
-		border-radius: 0.6rem;
-		padding: 0.7rem;
-		margin: 0.3rem 0 0.6rem;
-	}
-	.haverow {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.4rem;
-	}
-	.haverow select,
-	.haverow input {
-		padding: 0.4rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		background: var(--surface);
-		color: inherit;
-		font: inherit;
-	}
-	.haverow input {
-		width: 5rem;
-	}
-	.haverow .eq {
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
 	.hint.dim {
 		opacity: 0.8;
 		margin-top: 0.4rem;
 	}
+	article {
+		padding: 0 0.7rem;
+	}
 	@media print {
-		.noprint {
-			display: none !important;
+		article {
+			padding: 0;
 		}
 	}
 </style>

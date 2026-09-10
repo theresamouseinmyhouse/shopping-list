@@ -131,22 +131,22 @@
 
 <style>
 	.title { margin: 0.2rem 0; }
-	.meta { color: var(--muted); margin: 0 0 0.6rem; font-size: 0.9rem; }
+	.meta { color: var(--text-2); margin: 0 0 0.6rem; font-size: 0.9rem; }
 	.scaled { color: var(--accent); }
 	.notes { margin: 0 0 0.8rem; white-space: pre-wrap; }
 	h2 { font-size: 1rem; margin: 1rem 0 0.4rem; border-bottom: 1px solid var(--line); padding-bottom: 0.2rem; }
-	h5 { margin: 0.5rem 0 0.2rem; font-size: 0.82rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
+	h5 { margin: 0.5rem 0 0.2rem; font-size: 0.82rem; text-transform: uppercase; color: var(--text-3); letter-spacing: 0.03em; }
 	h5.stepgrp { padding-left: 0; }
 	.mise { margin: 0 0 0.5rem; padding-left: 1.1rem; }
 	.mise li { margin: 0.15rem 0; }
-	.amt { display: inline-block; min-width: 5.5rem; color: var(--muted); }
-	.cmt { color: var(--muted); }
+	.amt { display: inline-block; min-width: 5.5rem; color: var(--text-2); }
+	.cmt { color: var(--text-2); }
 	.steps { margin: 0; padding-left: 1.3rem; }
 	.step { margin: 0.6rem 0; }
 	.body { margin: 0.3rem 0; white-space: pre-wrap; }
 	.stepings { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.2rem 0; }
 	.pill { background: var(--surface-2); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.8rem; }
-	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface); overflow: hidden; }
+	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface-1); overflow: hidden; }
 	.embed-head {
 		display: flex;
 		align-items: center;
@@ -160,12 +160,12 @@
 		font-weight: 600;
 		color: inherit;
 	}
-	.embed-head :global(.chev) { flex: none; color: var(--muted); transition: transform 0.12s ease; }
+	.embed-head :global(.chev) { flex: none; color: var(--text-3); transition: transform 0.12s ease; }
 	.embed.collapsed .embed-head :global(.chev) { transform: rotate(-90deg); }
 	.embed-title { flex: 1; min-width: 0; }
 	.embed-more { flex: none; font-weight: 400; font-size: 0.78rem; color: var(--accent); }
 	.embed-body { padding: 0 0.8rem 0.5rem; }
-	.note { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0; }
+	.note { color: var(--text-2); font-size: 0.85rem; margin: 0.3rem 0; }
 
 	@media print {
 		.step, .embed { break-inside: avoid; }

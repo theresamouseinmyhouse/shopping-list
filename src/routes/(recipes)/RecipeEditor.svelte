@@ -213,15 +213,15 @@
 <form method="POST" {action} class="editor">
 	<input type="hidden" name="payload" value={payload} />
 
-	<label class="field">
+	<label class="fieldrow">
 		<span>Title</span>
-		<input class="rec-input" bind:value={title} required />
+		<input class="field" bind:value={title} required />
 	</label>
 	<div class="row2">
-		<label class="field"><span>Servings</span><input class="rec-input" bind:value={servings} placeholder="4" /></label>
-		<label class="field"><span>Source URL</span><input class="rec-input" bind:value={sourceUrl} placeholder="optional" /></label>
+		<label class="fieldrow"><span>Servings</span><input class="field" bind:value={servings} placeholder="4" /></label>
+		<label class="fieldrow"><span>Source URL</span><input class="field" bind:value={sourceUrl} placeholder="optional" /></label>
 	</div>
-	<label class="field"><span>Notes</span><textarea class="rec-textarea" bind:value={notes}></textarea></label>
+	<label class="fieldrow"><span>Notes</span><textarea class="field" bind:value={notes}></textarea></label>
 
 	<section class="card">
 		<h3>Ingredients</h3>
@@ -232,7 +232,7 @@
 		</div>
 		<div class="ta-wrap">
 			<textarea
-				class="rec-textarea big"
+				class="field big"
 				bind:value={ingredientsText}
 				bind:this={ingEl}
 				spellcheck="false"
@@ -273,7 +273,7 @@
 		</div>
 		<div class="ta-wrap">
 			<textarea
-				class="rec-textarea big"
+				class="field big"
 				bind:value={methodText}
 				bind:this={methodEl}
 				oninput={() => onTextareaInput('method')}
@@ -322,14 +322,14 @@
 			<label for="tidy-inst">Tidy with AI — what should it do?</label>
 			<textarea
 				id="tidy-inst"
-				class="rec-textarea"
+				class="field"
 				rows="2"
 				bind:value={tidyInstruction}
 				placeholder="e.g. put all the ingredient amounts in grams  ·  leave blank for a general cleanup"
 			></textarea>
 			<div class="tidybtns">
-				<button type="button" class="rec-btn" onclick={() => (tidyOpen = false)} disabled={tidying}>Cancel</button>
-				<button type="button" class="rec-btn primary" onclick={tidy} disabled={tidying}>
+				<button type="button" class="btn btn-sm" onclick={() => (tidyOpen = false)} disabled={tidying}>Cancel</button>
+				<button type="button" class="btn btn-sm btn-primary" onclick={tidy} disabled={tidying}>
 					{tidying ? 'Working…' : tidyInstruction.trim() ? 'Apply' : 'Clean up'}
 				</button>
 			</div>
@@ -338,22 +338,22 @@
 	{#if tidyErr}<p class="tidyerr">{tidyErr}</p>{/if}
 	<div class="actions">
 		{#if ai}
-			<button type="button" class="rec-btn" onclick={() => (tidyOpen = !tidyOpen)} disabled={tidying}>
+			<button type="button" class="btn btn-sm" onclick={() => (tidyOpen = !tidyOpen)} disabled={tidying}>
 				✨ Tidy with AI
 			</button>
 		{/if}
-		<button type="submit" class="rec-btn primary">{submitLabel}</button>
+		<button type="submit" class="btn btn-sm btn-primary">{submitLabel}</button>
 	</div>
 </form>
 
 <style>
 	.editor { display: flex; flex-direction: column; gap: 0.8rem; }
-	.field { display: flex; flex-direction: column; gap: 0.25rem; }
-	.field > span { font-size: 0.8rem; color: var(--muted); }
+	.fieldrow { display: flex; flex-direction: column; gap: 0.25rem; }
+	.fieldrow > span { font-size: 0.8rem; color: var(--text-2); }
 	.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 	.card { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.card h3 { margin: 0; font-size: 0.95rem; }
-	.hint { margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+	.hint { margin: 0; font-size: 0.76rem; color: var(--text-2); line-height: 1.5; }
 	.hint code { background: var(--surface-2); border-radius: 0.25rem; padding: 0 0.25rem; }
 	.mkbar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 	.mk-btn {
@@ -362,14 +362,14 @@
 		border: 1px solid var(--line);
 		border-radius: 0.4rem;
 		background: var(--surface-2);
-		color: var(--muted);
+		color: var(--text-2);
 		line-height: 1;
 	}
 	.mk-btn:active { background: var(--line); }
-	.rec-textarea.big { min-height: 8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+	.field.big { min-height: 8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
 	.preview { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 	.tag { background: var(--surface-2); border-radius: 999px; padding: 0.12rem 0.6rem; font-size: 0.8rem; }
-	.tag.linked { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+	.tag.linked { background: var(--accent-weak); }
 	.tag.sm { font-size: 0.72rem; padding: 0.05rem 0.45rem; }
 	.ta-wrap { position: relative; }
 	.subdrop {
@@ -381,7 +381,7 @@
 		margin: 0.15rem 0 0;
 		padding: 0.2rem;
 		list-style: none;
-		background: var(--bg);
+		background: var(--surface-1);
 		border: 1px solid var(--line);
 		border-radius: 0.5rem;
 		box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
@@ -404,7 +404,7 @@
 		background: var(--surface-2);
 	}
 	.warn {
-		background: color-mix(in srgb, var(--danger) 12%, transparent);
+		background: var(--danger-weak);
 		color: var(--danger);
 		border-radius: 0.5rem;
 		padding: 0.5rem 0.7rem;
@@ -414,14 +414,14 @@
 	.warn code { background: color-mix(in srgb, var(--danger) 18%, transparent); border-radius: 0.25rem; padding: 0 0.2rem; }
 	.steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.steps li { font-size: 0.85rem; }
-	.grp { display: block; font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
-	.stepbody { color: var(--muted); }
+	.grp { display: block; font-weight: 600; color: var(--text-3); font-size: 0.75rem; text-transform: uppercase; }
+	.stepbody { color: var(--text-2); }
 	.uses { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
-	.actions { position: sticky; bottom: 0; background: var(--bg); padding: 0.6rem 0; border-top: 1px solid var(--line); display: flex; gap: 0.5rem; }
-	.actions .primary { flex: 1; padding: 0.6rem; }
+	.actions { position: sticky; bottom: 0; background: var(--surface-1); padding: 0.6rem 0; border-top: 1px solid var(--line); display: flex; gap: 0.5rem; }
+	.actions .btn-primary { flex: 1; padding: 0.6rem; }
 	.tidyerr { color: var(--danger); font-size: 0.82rem; margin: 0.3rem 0; }
 	.tidybox { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; }
 	.tidybox label { font-size: 0.85rem; font-weight: 600; }
 	.tidybtns { display: flex; gap: 0.5rem; }
-	.tidybtns .primary { flex: 1; }
+	.tidybtns .btn-primary { flex: 1; }
 </style>

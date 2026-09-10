@@ -4,32 +4,18 @@
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import Minus from '@lucide/svelte/icons/minus';
-	import Plus from '@lucide/svelte/icons/plus';
 
 	let {
 		item,
 		place,
 		scopeName = '',
-		editing = $bindable(false)
+		onOptions
 	}: {
 		item: ItemView;
 		place: string;
 		scopeName?: string; // name of the store this item is pinned to, if any
-		editing?: boolean;
+		onOptions: (item: ItemView) => void;
 	} = $props();
-
-	const placeSelected = $derived(place !== '');
-	const pinnedHere = $derived(item.scope_place_id === place && placeSelected);
-	const pinnedElsewhere = $derived(item.scope_place_id !== '' && item.scope_place_id !== place);
-
-	let name = $state('');
-	let note = $state('');
-	function openEditor() {
-		name = item.name;
-		note = item.note;
-		editing = true;
-	}
 
 	function tick() {
 		try {
@@ -41,31 +27,6 @@
 	function toggleCheck() {
 		tick();
 		mutate({ type: 'set_check', item_id: item.id, checked: !item.checked });
-	}
-	function setQty(q: number) {
-		mutate({ type: 'set_qty', item_id: item.id, qty: Math.max(1, q) });
-	}
-	function toggleHide() {
-		mutate({ type: 'hide_item', item_id: item.id, scope_place_id: place, hidden: !item.hidden });
-		editing = false;
-	}
-	function setScope(scope: string) {
-		mutate({ type: 'set_item_scope', item_id: item.id, scope_place_id: scope });
-		editing = false;
-	}
-	function removeFromList() {
-		mutate({ type: 'remove_from_list', item_id: item.id });
-		editing = false;
-	}
-	function deleteForever() {
-		mutate({ type: 'delete_item', item_id: item.id });
-		editing = false;
-	}
-	function saveEdit() {
-		const n = name.trim();
-		if (n && n !== item.name) mutate({ type: 'rename_item', item_id: item.id, name: n });
-		if (note !== item.note) mutate({ type: 'set_note', item_id: item.id, note });
-		editing = false;
 	}
 
 	// The label area is inert — checking is the check circle, options is the
@@ -100,7 +61,7 @@
 	}
 </script>
 
-<li class="row" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
+<li class="itemrow" data-id={item.id} data-name={item.name} class:dim={item.checked || item.hidden}>
 	<div class="rowline" style="transform: translateX({dx}px)" class:swiping>
 		<span class="handle item-handle" aria-hidden="true"><GripVertical size={20} /></span>
 		<button
@@ -127,64 +88,23 @@
 				{#if item.note}<span class="nt">{item.note}</span>{/if}
 			</span>
 		</div>
-		<button
-			class="chev"
-			aria-label="Item options"
-			class:open={editing}
-			onclick={() => (editing ? (editing = false) : openEditor())}
-		>
+		<button class="chev" aria-label="Item options" onclick={() => onOptions(item)}>
 			<ChevronRight size={22} strokeWidth={2.5} />
 		</button>
 	</div>
-
-	{#if editing}
-		<div class="edit">
-			<input bind:value={name} placeholder="Name" onkeydown={(e) => e.key === 'Enter' && saveEdit()} />
-			<input bind:value={note} placeholder="Note (2%, big jug…)" onkeydown={(e) => e.key === 'Enter' && saveEdit()} />
-			<div class="stepper" aria-label="Quantity">
-				<button aria-label="Less" onclick={() => setQty(item.qty - 1)}><Minus size={16} /></button>
-				<span>{item.qty}</span>
-				<button aria-label="More" onclick={() => setQty(item.qty + 1)}><Plus size={16} /></button>
-			</div>
-			<label class="staple">
-				<input
-					type="checkbox"
-					checked={item.is_staple}
-					onchange={(e) => mutate({ type: 'set_staple', item_id: item.id, is_staple: e.currentTarget.checked })}
-				/> Staple
-			</label>
-			<div class="actions">
-				{#if placeSelected}
-					<button onclick={toggleHide}>{item.hidden ? 'Show here' : 'Hide here'}</button>
-					{#if pinnedHere}
-						<button onclick={() => setScope('')}>Show at every store</button>
-					{:else}
-						<button onclick={() => setScope(place)}>Only show here</button>
-					{/if}
-				{:else if pinnedElsewhere}
-					<button onclick={() => setScope('')}>
-						Only at {scopeName || 'one store'} — show everywhere
-					</button>
-				{/if}
-				<button onclick={removeFromList}>Remove</button>
-				<button class="danger" onclick={deleteForever}>Delete forever</button>
-				<button class="save" onclick={saveEdit}>Done</button>
-			</div>
-		</div>
-	{/if}
 </li>
 
 <style>
-	.row {
+	.itemrow {
 		list-style: none;
 		border-bottom: 1px solid var(--line);
 		background: var(--bg);
 		overflow: hidden;
 	}
-	.row:has(.swiping) {
-		background: linear-gradient(to right, #16a34a 0 3rem, var(--bg) 3rem);
+	.itemrow:has(.swiping) {
+		background: linear-gradient(to right, var(--good) 0 3rem, var(--bg) 3rem);
 	}
-	.row.dim .label {
+	.itemrow.dim .label {
 		opacity: 0.55;
 	}
 	.rowline {
@@ -215,7 +135,7 @@
 		cursor: grab;
 		touch-action: none;
 		padding: 0.7rem 0.6rem 0.7rem 0.5rem;
-		color: var(--muted);
+		color: var(--text-3);
 	}
 	.check {
 		flex: none;
@@ -231,7 +151,7 @@
 	.check .dot {
 		width: 1.6rem;
 		height: 1.6rem;
-		border: 2px solid var(--check-line);
+		border: 2px solid var(--line-strong);
 		border-radius: 999px;
 		display: grid;
 		place-items: center;
@@ -241,8 +161,8 @@
 		transform: scale(0.9);
 	}
 	.check .dot.on {
-		background: #16a34a;
-		border-color: #16a34a;
+		background: var(--good);
+		border-color: var(--good);
 	}
 	.label {
 		flex: 1;
@@ -261,12 +181,12 @@
 	.qty {
 		margin-left: 0.4rem;
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 		font-variant-numeric: tabular-nums;
 	}
 	.nt {
 		font-size: 0.78rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.chev {
 		flex: none;
@@ -276,75 +196,6 @@
 		height: 3rem;
 		background: none;
 		border: 0;
-		color: var(--muted);
-	}
-	.chev.open {
-		transform: rotate(90deg);
-	}
-	.edit {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		align-items: center;
-		padding: 0 0.6rem 0.7rem 3.2rem;
-		background: var(--bg);
-	}
-	.edit input:not([type='checkbox']) {
-		flex: 1 1 8rem;
-		padding: 0.5rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		background: var(--surface);
-		color: inherit;
-	}
-	.stepper {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		overflow: hidden;
-	}
-	.stepper button {
-		display: grid;
-		place-items: center;
-		width: 2.2rem;
-		height: 2.2rem;
-		border: 0;
-		background: var(--surface);
-	}
-	.stepper span {
-		min-width: 1.4rem;
-		text-align: center;
-		font-variant-numeric: tabular-nums;
-	}
-	.staple {
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		width: 100%;
-	}
-	.actions button {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		padding: 0.4rem 0.7rem;
-		font-size: 0.85rem;
-	}
-	.actions .danger {
-		color: var(--danger);
-	}
-	.actions .save {
-		margin-left: auto;
-		background: var(--accent);
-		color: #fff;
-		border-color: var(--accent);
+		color: var(--text-2);
 	}
 </style>

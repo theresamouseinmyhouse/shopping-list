@@ -2,11 +2,18 @@
 
 A location-aware smart shopping list. One shared list; "places" (stores — grocery
 *and* non-grocery) are filtered views over it. Each place is one flat, drag-ordered
-list — set it to match your walk through that store. The **All** view groups every
-item under its home store (drag a row between groups to re-home it) plus a "Not
-sorted yet" group. Every item remembers its position and hidden flag **per place**,
-inheriting from a no-place default. Offline-capable PWA with sync. Two-person
-household, one shared password.
+list — set it to match your walk through that store. Offline-capable PWA with sync.
+Two-person household, one shared password.
+
+## Navigation
+
+Bottom tab bar with four views:
+- **List** — the "All" view; groups every item under its home store. Drag a row between groups to re-home it.
+- **Stores** — list of stores, add/rename/delete/drag-reorder via sheets.
+- **Items** — browse every catalog item ever added; add to list, edit, or delete.
+- **Recipes** — list recipes; add to list, scale, import from a link/photo, or create new.
+
+Each place (store) is a separate, scoped view at `/stores/[id]` with its own drag-ordered list and quick-add. Every item remembers its position and hidden flag per place.
 
 ## Stack
 

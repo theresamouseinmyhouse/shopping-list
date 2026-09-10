@@ -108,7 +108,7 @@
 		border: 0;
 		border-bottom: 1px solid transparent;
 		background: transparent;
-		color: var(--muted);
+		color: var(--text-2);
 		font-size: 0.95rem;
 	}
 	input:focus {
@@ -167,7 +167,7 @@
 	}
 	.hint {
 		font-size: 0.7rem;
-		color: var(--muted);
+		color: var(--text-3);
 		border: 1px solid var(--line);
 		border-radius: 999px;
 		padding: 0.05rem 0.45rem;

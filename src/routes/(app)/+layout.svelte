@@ -32,10 +32,6 @@
 	});
 </script>
 
-<svelte:head>
-	<meta name="theme-color" content="#111827" />
-</svelte:head>
-
 {#if ui.booted && (!ui.online || ui.pending > 0)}
 	<button
 		class="statusbar"
@@ -51,28 +47,28 @@
 
 <InstallHint />
 
-{@render children?.()}
+<div class="group-scroll">{@render children?.()}</div>
 
 <style>
 	/* Floating pill — overlays content, never reflows the page. */
 	.statusbar {
 		position: fixed;
-		top: calc(env(safe-area-inset-top, 0px) + 0.4rem);
+		top: calc(env(safe-area-inset-top, 0px) + var(--header-h) + 0.4rem);
 		left: 50%;
 		transform: translateX(-50%);
 		z-index: 100;
 		max-width: calc(100% - 1rem);
 		border: 0;
-		border-radius: 999px;
+		border-radius: var(--r-full);
 		padding: 0.4rem 0.9rem;
 		font-size: 0.8rem;
 		font-weight: 600;
 		white-space: nowrap;
 		background: var(--accent);
 		color: #fff;
-		box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
 	}
 	.statusbar.offline {
-		background: var(--muted);
+		background: var(--text-3);
 	}
+	.group-scroll { padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 0.5rem); min-height: 100vh; }
 </style>

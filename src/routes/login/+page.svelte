@@ -58,37 +58,40 @@
 <svelte:head><title>List — {setup ? 'set up' : 'sign in'}</title></svelte:head>
 
 <main>
-	<form onsubmit={submit}>
-		<h1>List</h1>
-		{#if setup}
-			<p class="lead">Pick a password for this list. Everyone in the household shares it.</p>
-			<label>
-				New password
-				<!-- svelte-ignore a11y_autofocus -->
-				<input type="password" bind:value={password} autocomplete="new-password" autofocus required />
-			</label>
-			<label>
-				Confirm password
-				<input type="password" bind:value={confirm} autocomplete="new-password" required />
-			</label>
-		{:else}
-			<label>
-				Password
-				<!-- svelte-ignore a11y_autofocus -->
-				<input
-					type="password"
-					bind:value={password}
-					autocomplete="current-password"
-					autofocus
-					required
-				/>
-			</label>
-		{/if}
-		{#if error}<p class="err">{error}</p>{/if}
-		<button type="submit" disabled={busy}>
-			{busy ? '…' : setup ? 'Create password' : 'Sign in'}
-		</button>
-	</form>
+	<div class="login-card">
+		<form onsubmit={submit}>
+			<h1>List</h1>
+			{#if setup}
+				<p class="lead">Pick a password for this list. Everyone in the household shares it.</p>
+				<label>
+					New password
+					<!-- svelte-ignore a11y_autofocus -->
+					<input class="field" type="password" bind:value={password} autocomplete="new-password" autofocus required />
+				</label>
+				<label>
+					Confirm password
+					<input class="field" type="password" bind:value={confirm} autocomplete="new-password" required />
+				</label>
+			{:else}
+				<label>
+					Password
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						class="field"
+						type="password"
+						bind:value={password}
+						autocomplete="current-password"
+						autofocus
+						required
+					/>
+				</label>
+			{/if}
+			{#if error}<p class="err">{error}</p>{/if}
+			<button type="submit" class="btn btn-primary" disabled={busy}>
+				{busy ? '…' : setup ? 'Create password' : 'Sign in'}
+			</button>
+		</form>
+	</div>
 </main>
 
 <style>
@@ -98,8 +101,21 @@
 		place-items: center;
 		padding: 1rem;
 	}
+	.login-card {
+		background: var(--surface-1);
+		border: 1px solid var(--line);
+		border-radius: var(--r-lg);
+		padding: 1.2rem;
+		max-width: 22rem;
+		margin: 4rem auto;
+	}
+	label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		font-size: var(--fs-sub);
+	}
 	form {
-		width: min(22rem, 100%);
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -112,33 +128,12 @@
 	.lead {
 		margin: 0;
 		font-size: 0.9rem;
-		color: var(--muted, #64748b);
+		color: var(--text-3);
 		text-align: center;
-	}
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		font-size: 0.85rem;
-	}
-	input {
-		padding: 0.7rem 0.8rem;
-		font-size: 1rem;
-		border: 1px solid var(--line, #cbd5e1);
-		border-radius: 0.6rem;
-	}
-	button {
-		padding: 0.75rem;
-		font-size: 1rem;
-		font-weight: 600;
-		border: 0;
-		border-radius: 0.6rem;
-		background: var(--accent, #2563eb);
-		color: #fff;
 	}
 	.err {
 		margin: 0;
-		color: #dc2626;
+		color: var(--danger);
 		font-size: 0.85rem;
 	}
 </style>

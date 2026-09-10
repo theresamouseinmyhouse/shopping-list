@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RecipeEditor from '../../RecipeEditor.svelte';
+	import Screen from '$lib/nav/Screen.svelte';
 	import { hasDualMeasure, displayAmount, type RecipeInput } from '$lib/recipe';
 	let { data, form } = $props();
 
@@ -52,11 +53,7 @@
 
 <svelte:head><title>Import recipe</title></svelte:head>
 
-<div class="rec-topbar">
-	<a class="rec-link" href="/recipes">‹ Recipes</a>
-	<strong>Import a recipe</strong>
-</div>
-
+<Screen title="Import a recipe" back="/recipes">
 {#if draft && choosing}
 	<p class="ok">This recipe measures some ingredients two ways. Pick one for each:</p>
 	<div class="chooser">
@@ -76,7 +73,7 @@
 			</div>
 		{/each}
 	</div>
-	<button class="rec-btn primary" disabled={!allPicked} onclick={() => (choosing = false)}>Continue to editor</button>
+	<button class="btn btn-sm btn-primary" disabled={!allPicked} onclick={() => (choosing = false)}>Continue to editor</button>
 {:else if draft}
 	<p class="ok">Read from {methodLabel[form?.method ?? 'text']} — review and save.</p>
 	<RecipeEditor
@@ -99,11 +96,11 @@
 	<form method="POST" action="?/url" class="box">
 		<h3>From a link</h3>
 		<p class="hint">No AI for sites that publish structured recipe data (most do).</p>
-		<input class="rec-input" name="url" type="url" placeholder="https://…" bind:value={url} required />
+		<input class="field" name="url" type="url" placeholder="https://…" bind:value={url} required />
 		<div class="btnrow">
-			<button class="rec-btn primary">Fetch</button>
+			<button class="btn btn-sm btn-primary">Fetch</button>
 			{#if data.ai}
-				<button class="rec-btn" formaction="?/aiUrl">Fetch with AI</button>
+				<button class="btn btn-sm" formaction="?/aiUrl">Fetch with AI</button>
 			{/if}
 		</div>
 	</form>
@@ -111,11 +108,11 @@
 	<form method="POST" action="?/text" class="box">
 		<h3>Paste text</h3>
 		<p class="hint">Paste an ingredients list + method. Parsed locally, no AI.</p>
-		<textarea class="rec-textarea" name="text" rows="6" bind:value={text} placeholder={'Ingredients\n2 cups flour\n1 tsp salt\n\nMethod\nMix and bake.'}></textarea>
+		<textarea class="field" name="text" rows="6" bind:value={text} placeholder={'Ingredients\n2 cups flour\n1 tsp salt\n\nMethod\nMix and bake.'}></textarea>
 		<div class="btnrow">
-			<button class="rec-btn primary">Parse</button>
+			<button class="btn btn-sm btn-primary">Parse</button>
 			{#if data.ai}
-				<button class="rec-btn" formaction="?/aiText">Parse with AI</button>
+				<button class="btn btn-sm" formaction="?/aiText">Parse with AI</button>
 			{/if}
 		</div>
 	</form>
@@ -124,13 +121,14 @@
 		<h3>From a photo</h3>
 		{#if data.ai}
 			<p class="hint">A clear photo of a recipe page or card. Uses AI.</p>
-			<input class="rec-input" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required />
-			<button class="rec-btn primary">Read photo</button>
+			<input class="field" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required />
+			<button class="btn btn-sm btn-primary">Read photo</button>
 		{:else}
 			<p class="hint">Needs an AI key (<code>LIST_GEMINI_API_KEY</code>). Not configured.</p>
 		{/if}
 	</form>
 {/if}
+</Screen>
 
 <style>
 	.box {
@@ -149,7 +147,7 @@
 	.hint {
 		margin: 0;
 		font-size: 0.8rem;
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.btnrow {
 		display: flex;
@@ -169,7 +167,7 @@
 		font-size: 0.88rem;
 	}
 	.ok {
-		color: var(--muted);
+		color: var(--text-2);
 		font-size: 0.9rem;
 	}
 	.chooser {
@@ -193,12 +191,12 @@
 		border: 1px solid var(--line);
 		border-radius: 0.5rem;
 		padding: 0.35rem 0.7rem;
-		background: var(--surface);
+		background: var(--surface-1);
 		color: inherit;
 		font: inherit;
 	}
 	.opts .both {
-		color: var(--muted);
+		color: var(--text-2);
 	}
 	.opts .donev {
 		padding: 0.35rem 0;
