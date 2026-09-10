@@ -107,6 +107,44 @@
 		ta.setSelectionRange(caret, caret);
 	}
 
+	// ---- markup helper buttons ---------------------------------------------
+	async function focusCaret(ta: HTMLTextAreaElement, caret: number) {
+		await tick();
+		ta.focus();
+		ta.setSelectionRange(caret, caret);
+	}
+
+	/** insert `prefix` on a fresh line at the cursor (reusing the current line if blank) */
+	async function insertLine(which: 'ing' | 'method', prefix: string, openSub = false) {
+		const ta = which === 'ing' ? ingEl : methodEl;
+		if (!ta) return;
+		const isIng = which === 'ing';
+		const text = isIng ? ingredientsText : methodText;
+		const pos = ta.selectionStart ?? text.length;
+		const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+		let lineEnd = text.indexOf('\n', pos);
+		if (lineEnd === -1) lineEnd = text.length;
+		const lineEmpty = text.slice(lineStart, lineEnd).trim() === '';
+		const at = lineEmpty ? lineStart : lineEnd;
+		const ins = lineEmpty ? prefix : '\n' + prefix;
+		const caret = at + ins.length;
+		const next = text.slice(0, at) + ins + text.slice(at);
+		if (isIng) ingredientsText = next;
+		else methodText = next;
+		await focusCaret(ta, caret);
+		if (openSub) onTextareaInput(which);
+	}
+
+	/** method only: blank line = new step */
+	async function newStep() {
+		if (!methodEl) return;
+		const pos = methodEl.selectionStart ?? methodText.length;
+		const before = methodText.slice(0, pos).replace(/\s+$/, '');
+		const after = methodText.slice(pos).replace(/^\s+/, '');
+		methodText = `${before}\n\n${after}`;
+		await focusCaret(methodEl, before.length + 2);
+	}
+
 	function onSubKeydown(e: KeyboardEvent) {
 		if (subTarget === null || subMatches.length === 0) return;
 		if (e.key === 'ArrowDown') {
@@ -187,7 +225,11 @@
 
 	<section class="card">
 		<h3>Ingredients</h3>
-		<p class="hint">One per line: <code>1 1/2 cups flour (sifted)</code>. <code>## For the sauce</code> starts a group. <code>2 lb | 900 g</code> for two measures. <code>+ name</code> to use another recipe.</p>
+		<p class="hint">One per line: <code>1 1/2 cups flour (sifted)</code>. <code>2 lb | 900 g</code> for two measures.</p>
+		<div class="mkbar">
+			<button type="button" class="mk-btn" onclick={() => insertLine('ing', '## ')}>＋ Group heading</button>
+			<button type="button" class="mk-btn" onclick={() => insertLine('ing', '+ ', true)}>＋ Sub-recipe</button>
+		</div>
 		<div class="ta-wrap">
 			<textarea
 				class="rec-textarea big"
@@ -223,7 +265,12 @@
 
 	<section class="card">
 		<h3>Method</h3>
-		<p class="hint">Write the steps as prose — one step per paragraph (blank line between). Name ingredients where you use them and they link automatically. <code>## Section</code> for parts, <code>+ name</code> to embed another recipe.</p>
+		<p class="hint">Write the steps as prose — one step per paragraph. Name ingredients where you use them and they link automatically.</p>
+		<div class="mkbar">
+			<button type="button" class="mk-btn" onclick={newStep}>＋ Step</button>
+			<button type="button" class="mk-btn" onclick={() => insertLine('method', '## ')}>＋ Section</button>
+			<button type="button" class="mk-btn" onclick={() => insertLine('method', '+ ', true)}>＋ Sub-recipe</button>
+		</div>
 		<div class="ta-wrap">
 			<textarea
 				class="rec-textarea big"
@@ -308,6 +355,17 @@
 	.card h3 { margin: 0; font-size: 0.95rem; }
 	.hint { margin: 0; font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
 	.hint code { background: var(--surface-2); border-radius: 0.25rem; padding: 0 0.25rem; }
+	.mkbar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+	.mk-btn {
+		font-size: 0.75rem;
+		padding: 0.3rem 0.6rem;
+		border: 1px solid var(--line);
+		border-radius: 0.4rem;
+		background: var(--surface-2);
+		color: var(--muted);
+		line-height: 1;
+	}
+	.mk-btn:active { background: var(--line); }
 	.rec-textarea.big { min-height: 8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
 	.preview { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 	.tag { background: var(--surface-2); border-radius: 999px; padding: 0.12rem 0.6rem; font-size: 0.8rem; }

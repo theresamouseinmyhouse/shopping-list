@@ -2,13 +2,32 @@
 	import { type ResolvedRecipe, type ResolvedChild, type ResolvedIngredient } from '$lib/recipe';
 	import { formatAmount } from '$lib/units';
 	import { scaleQuantity, parseQuantity, formatQuantity } from '$lib/scale';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Self from './RecipeBody.svelte';
 
 	let {
 		recipe,
 		embedded = false,
+		hideTitle = false,
 		scale = 1
-	}: { recipe: ResolvedRecipe; embedded?: boolean; scale?: number } = $props();
+	}: { recipe: ResolvedRecipe; embedded?: boolean; hideTitle?: boolean; scale?: number } = $props();
+
+	// collapsed embedded sub-recipes — remembered per device, keyed by sub-recipe id
+	// ("I already made the bacon bits" stays collapsed wherever that recipe is embedded)
+	let collapsed = $state<Record<string, boolean>>({});
+	try {
+		collapsed = JSON.parse(localStorage.getItem('recipe.collapsed') || '{}');
+	} catch {
+		/* private mode / bad json */
+	}
+	function toggleEmbed(id: string) {
+		collapsed[id] = !collapsed[id];
+		try {
+			localStorage.setItem('recipe.collapsed', JSON.stringify(collapsed));
+		} catch {
+			/* ignore */
+		}
+	}
 
 	const one = (q: string, u: string) => formatAmount(scaleQuantity(q, scale), u);
 
@@ -41,7 +60,21 @@
 
 {#snippet child(c: ResolvedChild)}
 	{#if c.kind === 'recipe'}
-		<div class="embed"><Self recipe={c.recipe} embedded {scale} /></div>
+		<div class="embed" class:collapsed={collapsed[c.recipe.id]}>
+			<button
+				type="button"
+				class="embed-head"
+				aria-expanded={!collapsed[c.recipe.id]}
+				onclick={() => toggleEmbed(c.recipe.id)}
+			>
+				<ChevronDown class="chev" size={16} />
+				<span class="embed-title">{c.recipe.title}</span>
+				{#if collapsed[c.recipe.id]}<span class="embed-more">show</span>{/if}
+			</button>
+			<div class="embed-body" hidden={collapsed[c.recipe.id]}>
+				<Self recipe={c.recipe} embedded hideTitle {scale} />
+			</div>
+		</div>
 	{:else if c.kind === 'cycle'}
 		<p class="note">↻ see “{c.title}” above</p>
 	{:else}
@@ -49,7 +82,9 @@
 	{/if}
 {/snippet}
 
-<svelte:element this={embedded ? 'h3' : 'h1'} class="title">{recipe.title}</svelte:element>
+{#if !hideTitle}
+	<svelte:element this={embedded ? 'h3' : 'h1'} class="title">{recipe.title}</svelte:element>
+{/if}
 {#if recipe.servings}<p class="meta">Serves {scaledServings}{#if scale !== 1}<span class="scaled"> · scaled ×{formatQuantity(scale)}</span>{/if}</p>{/if}
 {#if recipe.notes}<p class="notes">{recipe.notes}</p>{/if}
 
@@ -107,11 +142,33 @@
 	.body { margin: 0.3rem 0; white-space: pre-wrap; }
 	.stepings { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.2rem 0; }
 	.pill { background: var(--surface-2); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.8rem; }
-	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; padding: 0.5rem 0.8rem; margin: 0.6rem 0; background: var(--surface); }
+	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface); overflow: hidden; }
+	.embed-head {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		width: 100%;
+		padding: 0.45rem 0.7rem;
+		background: none;
+		border: 0;
+		text-align: left;
+		font: inherit;
+		font-weight: 600;
+		color: inherit;
+	}
+	.embed-head :global(.chev) { flex: none; color: var(--muted); transition: transform 0.12s ease; }
+	.embed.collapsed .embed-head :global(.chev) { transform: rotate(-90deg); }
+	.embed-title { flex: 1; min-width: 0; }
+	.embed-more { flex: none; font-weight: 400; font-size: 0.78rem; color: var(--accent); }
+	.embed-body { padding: 0 0.8rem 0.5rem; }
 	.note { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0; }
 
 	@media print {
 		.step, .embed { break-inside: avoid; }
 		.pill { border: 1px solid #999; background: none; }
+		/* always print sub-recipes in full, even if collapsed on screen */
+		.embed-body[hidden] { display: block !important; }
+		.embed-head :global(.chev), .embed-more { display: none; }
+		.embed.collapsed .embed-body { padding-top: 0.4rem; }
 	}
 </style>
