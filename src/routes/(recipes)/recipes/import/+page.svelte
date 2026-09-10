@@ -191,7 +191,7 @@
 		border: 1px solid var(--line);
 		border-radius: 0.5rem;
 		padding: 0.35rem 0.7rem;
-		background: var(--surface);
+		background: var(--surface-1);
 		color: inherit;
 		font: inherit;
 	}

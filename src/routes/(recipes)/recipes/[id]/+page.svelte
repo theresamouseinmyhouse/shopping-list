@@ -242,7 +242,7 @@
 		margin-right: 0.1rem;
 	}
 	.sc {
-		background: var(--surface);
+		background: var(--surface-1);
 		border: 1px solid var(--line);
 		border-radius: 0.5rem;
 		padding: 0.25rem 0.55rem;

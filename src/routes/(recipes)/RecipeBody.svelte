@@ -146,7 +146,7 @@
 	.body { margin: 0.3rem 0; white-space: pre-wrap; }
 	.stepings { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.2rem 0; }
 	.pill { background: var(--surface-2); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.8rem; }
-	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface); overflow: hidden; }
+	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface-1); overflow: hidden; }
 	.embed-head {
 		display: flex;
 		align-items: center;
