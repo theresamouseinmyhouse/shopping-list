@@ -267,9 +267,6 @@
 		padding: 0 0.7rem;
 	}
 	@media print {
-		.noprint {
-			display: none !important;
-		}
 		article {
 			padding: 0;
 		}

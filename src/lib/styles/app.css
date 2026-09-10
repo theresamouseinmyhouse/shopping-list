@@ -135,6 +135,10 @@ textarea.field { resize: vertical; min-height: 3rem; }
 	border-radius: 4px;
 }
 
+@media print {
+	.noprint { display: none !important; }
+}
+
 /* ===== back-compat aliases (removed in Task 10) ===== */
 :root { --muted: var(--text-2); } /* alias — removed in Task 10 */
 .rec-btn { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.4rem; padding: 0.5rem 0.8rem; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface-2); color: var(--text); font: inherit; font-size: var(--fs-sub); }
