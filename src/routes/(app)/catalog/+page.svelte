@@ -4,6 +4,7 @@
 	import { uuid } from '$lib/client/uuid';
 	import Star from '@lucide/svelte/icons/star';
 	import Screen from '$lib/nav/Screen.svelte';
+	import Sheet from '$lib/nav/Sheet.svelte';
 
 	const rows = $derived.by(() => {
 		ui.rev;
@@ -36,6 +37,7 @@
 	let editing = $state<string | null>(null);
 	let draftName = $state('');
 	let draftNote = $state('');
+	const editingItem = $derived(items.find((i) => i.id === editing) ?? null);
 
 	const filtered = $derived(
 		items.filter(
@@ -137,7 +139,7 @@
 	{/if}
 
 	{#each filtered as i (i.id)}
-		<div class="item" class:open={editing === i.id}>
+		<div class="item">
 			<div class="line">
 				<button
 					class="star"
@@ -147,7 +149,7 @@
 				>
 					<Star size={20} fill={i.is_staple ? 'currentColor' : 'none'} />
 				</button>
-				<button class="body" onclick={() => (editing === i.id ? (editing = null) : open(i))}>
+				<button class="body" onclick={() => open(i)}>
 					<span class="name">{i.name}</span>
 					{#if i.note}<span class="note">{i.note}</span>{/if}
 				</button>
@@ -157,18 +159,39 @@
 					<button class="add" onclick={() => addToList(i)}>+ list</button>
 				{/if}
 			</div>
-			{#if editing === i.id}
-				<div class="edit">
-					<input bind:value={draftName} placeholder="Name" onkeydown={(e) => e.key === 'Enter' && save(i)} />
-					<input bind:value={draftNote} placeholder="Note (2%, big jug…)" onkeydown={(e) => e.key === 'Enter' && save(i)} />
-					<div class="editbtns">
-						<button class="del" onclick={() => del(i)}>Delete</button>
-						<button class="done" onclick={() => save(i)}>Done</button>
-					</div>
-				</div>
-			{/if}
 		</div>
 	{/each}
+
+	<Sheet
+		open={editing !== null}
+		onClose={() => (editing = null)}
+		title={editingItem?.name ?? 'Item'}
+	>
+		{#if editingItem}
+			<input class="field" bind:value={draftName} placeholder="Name" />
+			<input class="field" bind:value={draftNote} placeholder="Note (2%, big jug…)" />
+			<label class="staple-toggle">
+				<input
+					type="checkbox"
+					checked={editingItem.is_staple}
+					onchange={(e) =>
+						editingItem &&
+						mutate({
+							type: 'set_staple',
+							item_id: editingItem.id,
+							is_staple: e.currentTarget.checked
+						})}
+				/>
+				Staple
+			</label>
+		{/if}
+		{#snippet foot()}
+			<button class="btn btn-danger" onclick={() => editingItem && del(editingItem)}>Delete</button>
+			<span style="flex:1"></span>
+			<button class="btn" onclick={() => (editing = null)}>Cancel</button>
+			<button class="btn btn-primary" onclick={() => editingItem && save(editingItem)}>Done</button>
+		{/snippet}
+	</Sheet>
 </Screen>
 
 <style>
@@ -245,37 +268,5 @@
 		padding: 0.35rem 0.6rem;
 		font-size: 0.85rem;
 		color: var(--accent);
-	}
-	.edit {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		padding: 0 0.6rem 0.7rem 2rem;
-	}
-	.edit input {
-		flex: 1 1 8rem;
-		padding: 0.5rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
-		background: var(--surface);
-		color: inherit;
-	}
-	.editbtns {
-		display: flex;
-		justify-content: space-between;
-		width: 100%;
-	}
-	.del {
-		background: none;
-		border: 0;
-		color: var(--danger);
-		font-size: 0.85rem;
-	}
-	.done {
-		background: var(--accent);
-		color: #fff;
-		border: 0;
-		border-radius: 0.5rem;
-		padding: 0.4rem 0.9rem;
 	}
 </style>

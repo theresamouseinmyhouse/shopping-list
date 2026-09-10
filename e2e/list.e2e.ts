@@ -273,8 +273,9 @@ test('Items screen: staples filter, edit, delete, add back to list', async ({ pa
 	await page.click('nav.tabbar a:has-text("Items")');
 	await page.uncheck('.staple-toggle input[type=checkbox]');
 	await page.click('.item:has-text("Sugar") .body');
+	await expect(page.locator('.sheet-panel')).toBeVisible();
 	page.once('dialog', (d) => d.accept());
-	await page.click('.item:has-text("Sugar") button:has-text("Delete")');
+	await page.click('.sheet-panel button:has-text("Delete")');
 	await expect(page.locator('.item:has-text("Sugar")')).toHaveCount(0);
 });
 
