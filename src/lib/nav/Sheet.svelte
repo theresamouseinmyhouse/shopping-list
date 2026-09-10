@@ -19,8 +19,19 @@
 	let dragY = $state(0);
 
 	function dismiss() {
-		onClose?.();
-		open = false;
+		if (onClose) onClose();
+		else open = false;
+	}
+
+	/**
+	 * Dismiss from a pointer interaction (backdrop tap, swipe). The backdrop covers
+	 * the whole viewport, so removing it synchronously inside the click handler
+	 * strands the browser's pointer target on the removed node until the next
+	 * pointermove — the immediate next tap anywhere "does nothing". Defer the
+	 * unmount to the next macrotask so the click event fully settles first.
+	 */
+	function dismissDeferred() {
+		setTimeout(dismiss, 0);
 	}
 
 	$effect(() => {
@@ -34,7 +45,7 @@
 		return () => {
 			document.body.style.overflow = prev;
 			window.removeEventListener('keydown', onKey);
-			opener?.focus?.();
+			if (opener?.isConnected) opener.focus?.();
 		};
 	});
 
@@ -51,13 +62,13 @@
 		const shouldClose = dragY > 60;
 		start = 0;
 		dragY = 0;
-		if (shouldClose) dismiss();
+		if (shouldClose) dismissDeferred();
 	}
 </script>
 
 {#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="sheet-backdrop noprint" role="presentation" onclick={dismiss}></div>
+	<div class="sheet-backdrop noprint" role="presentation" onclick={dismissDeferred}></div>
 	<div
 		class="sheet-panel noprint"
 		role="dialog"
