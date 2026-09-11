@@ -9,7 +9,8 @@ import {
 	loginRateOk,
 	needsSetup,
 	setInitialPassword,
-	checkPassword
+	checkPassword,
+	ensurePasswordSeeded
 } from './auth';
 
 describe('password hashing', () => {
@@ -60,6 +61,28 @@ describe('first-run setup', () => {
 		expect(await setInitialPassword(db, 'attacker-password')).toBe(false);
 		expect(await checkPassword(db, 'original-password')).toBe(true);
 		expect(await checkPassword(db, 'attacker-password')).toBe(false);
+	});
+});
+
+describe('ensurePasswordSeeded', () => {
+	it('seeds LIST_PASSWORD into a fresh db', async () => {
+		const db = openDb(':memory:');
+		await ensurePasswordSeeded(db, 'env-password');
+		expect(await checkPassword(db, 'env-password')).toBe(true);
+	});
+
+	it('does nothing on a fresh db when no env password is given (first-run screen stays up)', async () => {
+		const db = openDb(':memory:');
+		await ensurePasswordSeeded(db, undefined);
+		expect(needsSetup(db)).toBe(true);
+	});
+
+	it('never overwrites a password that already exists, even if the env value differs', async () => {
+		const db = openDb(':memory:');
+		await setInitialPassword(db, 'chosen-in-app');
+		await ensurePasswordSeeded(db, 'different-env-password');
+		expect(await checkPassword(db, 'chosen-in-app')).toBe(true);
+		expect(await checkPassword(db, 'different-env-password')).toBe(false);
 	});
 });
 

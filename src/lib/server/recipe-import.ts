@@ -5,10 +5,11 @@
 
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { env } from '$env/dynamic/private';
 import { emptyRecipeInput, matchIngredientsInProse, type RecipeInput } from '../recipe';
 import { parseIngredientText, parsePlainRecipe, serializeRecipe } from '../recipe-parse';
 import { normalizeName } from '../types';
+import { getAiConfig } from './settings';
+import type { DB } from './db';
 
 const GEMINI_PROMPT = `You are given a recipe (as text or a photo of a page). Reply with ONLY the recipe in this exact plain-text format, nothing else:
 
@@ -39,7 +40,7 @@ Rules:
 
 export class ImportError extends Error {}
 
-export type ImportMethod = 'json-ld' | 'microdata' | 'text' | 'ai';
+export type ImportMethod = 'json-ld' | 'microdata' | 'text' | 'ai' | 'generated';
 export interface ImportResult {
 	draft: RecipeInput;
 	method: ImportMethod;
@@ -128,35 +129,35 @@ export function importFromText(text: string): ImportResult {
 // the model to *correct that draft* against the source (smaller, safer job).
 // ---------------------------------------------------------------------------
 
-async function refine(rough: RecipeInput, source: string): Promise<RecipeInput> {
+async function refine(db: DB, rough: RecipeInput, source: string): Promise<RecipeInput> {
 	// the draft is the primary input; a trimmed slice of source text is just
 	// context for filling gaps — a full stripped page (nav/footer/related) both
 	// wastes tokens and pushes latency past the timeout.
 	const prompt = `${REFINE_PROMPT}\n\n=== PARSED ===\n${serializeRecipe(rough)}\n\n=== SOURCE ===\n${source.slice(0, 8_000)}`;
-	return parsePlainRecipe(await callGemini([{ text: prompt }]));
+	return parsePlainRecipe(await callGemini(db, [{ text: prompt }]));
 }
 
-export async function importFromUrlWithAi(rawUrl: string): Promise<ImportResult> {
+export async function importFromUrlWithAi(db: DB, rawUrl: string): Promise<ImportResult> {
 	const { url, html } = await fetchHtml(rawUrl);
 	const { draft: rough } = parseHtmlRecipe(html);
-	const draft = await refine(rough, stripHtml(html));
+	const draft = await refine(db, rough, stripHtml(html));
 	draft.source_url = url.toString();
 	return { draft, method: 'ai', thin: isThin(draft) };
 }
 
-export async function importFromTextWithAi(text: string): Promise<ImportResult> {
-	const draft = await refine(parsePlainRecipe(text), text);
+export async function importFromTextWithAi(db: DB, text: string): Promise<ImportResult> {
+	const draft = await refine(db, parsePlainRecipe(text), text);
 	return { draft, method: 'ai', thin: isThin(draft) };
 }
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-export async function importFromImage(bytes: Uint8Array, mime: string): Promise<ImportResult> {
+export async function importFromImage(db: DB, bytes: Uint8Array, mime: string): Promise<ImportResult> {
 	if (!IMAGE_TYPES.has(mime)) throw new ImportError('Upload a JPEG, PNG or WebP photo.');
 	if (bytes.byteLength > 8_000_000) throw new ImportError('That image is too large (max 8 MB).');
 	const b64 = Buffer.from(bytes).toString('base64');
 	const draft = parsePlainRecipe(
-		await callGemini([{ text: GEMINI_PROMPT }, { inlineData: { mimeType: mime, data: b64 } }])
+		await callGemini(db, [{ text: GEMINI_PROMPT }, { inlineData: { mimeType: mime, data: b64 } }])
 	);
 	return { draft, method: 'ai', thin: isThin(draft) };
 }
@@ -166,15 +167,49 @@ export async function importFromImage(bytes: Uint8Array, mime: string): Promise<
  * with one ("make all amounts grams", "halve it", "simplify the steps") that
  * becomes the sole directive.
  */
-export async function tidyRecipe(input: RecipeInput, instruction = ''): Promise<RecipeInput> {
+export async function tidyRecipe(db: DB, input: RecipeInput, instruction = ''): Promise<RecipeInput> {
 	const task = instruction.trim() ? TIDY_INSTRUCTION_PROMPT(instruction.trim()) : TIDY_PROMPT;
-	const out = parsePlainRecipe(await callGemini([{ text: `${task}\n\n${serializeRecipe(input)}` }]));
+	const out = parsePlainRecipe(await callGemini(db, [{ text: `${task}\n\n${serializeRecipe(input)}` }]));
 	out.source_url = input.source_url;
 	return out;
 }
 
-export function aiConfigured(): boolean {
-	return !!env.LIST_GEMINI_API_KEY?.trim();
+const GENERATE_PROMPT = (
+	description: string
+) => `Create an original, cookable recipe for: ${description}
+
+Reply with ONLY the recipe in this exact plain-text format, nothing else:
+
+Title: <name>
+Serves: <yield>
+
+@ingredients
+1 1/2 cups | 190 g  all-purpose flour (sifted)
+1 tsp  fine salt
+
+@method
+Cream the butter and sugar until pale. Beat in the eggs one at a time.
+
+Bake at 350F for 25 minutes.
+
+Rules:
+- List EVERY ingredient once, under @ingredients, quantity first then unit then name ("2 tbsp butter", "1 onion").
+- Put prep notes in parentheses or after a comma so the name stays plain.
+- Give a weight AND volume for a baking ingredient where that's normal, separated by " | ": "1 1/2 cups | 190 g flour".
+- Under @method, write the steps as normal prose, one step per paragraph (blank line between). Name the ingredients in the prose where they are used — do not add a separate list.
+- "## " lines are section headers; use them if the recipe has clear parts (e.g. "For the sauce").
+- Standard unit abbreviations: tsp, tbsp, cup, g, kg, oz, lb, ml, l.
+- Prefer a well-established version of the dish (sensible ratios, real technique, plausible timing) over an untested invention.`;
+
+/** A recipe made up from a short description, not sourced from anywhere. */
+export async function generateFromDescription(db: DB, description: string): Promise<ImportResult> {
+	const draft = parsePlainRecipe(await callGemini(db, [{ text: GENERATE_PROMPT(description) }]));
+	return { draft, method: 'generated', thin: isThin(draft) };
+}
+
+export function aiConfigured(db: DB): boolean {
+	const cfg = getAiConfig(db);
+	return cfg.enabled && !!cfg.apiKey;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,21 +218,25 @@ export function aiConfigured(): boolean {
 
 type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
-export async function callGemini(parts: GeminiPart[]): Promise<string> {
-	const key = env.LIST_GEMINI_API_KEY?.trim();
-	if (!key) throw new ImportError('AI import is not configured (set LIST_GEMINI_API_KEY).');
-	const model = env.LIST_GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+export async function callGemini(db: DB, parts: GeminiPart[]): Promise<string> {
+	const cfg = getAiConfig(db);
+	if (!cfg.enabled || !cfg.apiKey)
+		throw new ImportError('AI is turned off or has no key set — check Settings.');
+	const model = cfg.model || 'gemini-2.5-flash';
+	const finalParts = cfg.extraInstructions
+		? [...parts, { text: `Additional instructions from the household: ${cfg.extraInstructions}` }]
+		: parts;
 
 	const res = await fetchWithTimeout(
 		new URL(
-			`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`
+			`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.apiKey}`
 		),
 		75_000,
 		{
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
-				contents: [{ role: 'user', parts }],
+				contents: [{ role: 'user', parts: finalParts }],
 				generationConfig: {
 					responseMimeType: 'text/plain',
 					temperature: 0.2,

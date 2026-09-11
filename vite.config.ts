@@ -26,7 +26,7 @@ export default defineConfig({
 				navigateFallback: '/',
 				// /recipes/* is server-rendered (online-only) — must not get the SPA shell
 				// NOTE: /stores and /stores/[id] are in the (app) SPA group — do NOT denylist them.
-				navigateFallbackDenylist: [/^\/api\//, /^\/login/, /^\/recipes/],
+				navigateFallbackDenylist: [/^\/api\//, /^\/login/, /^\/recipes/, /^\/settings/],
 				globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
 				runtimeCaching: []
 			}

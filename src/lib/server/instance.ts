@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { appDb, getMeta, setMeta, type DB } from './db';
 import { ensurePasswordSeeded, randomSecret } from './auth';
+import { ensureAiConfigSeeded } from './settings';
 
 let ready: Promise<{ db: DB; secret: string }> | null = null;
 
@@ -13,6 +14,7 @@ export function instance(): Promise<{ db: DB; secret: string }> {
 async function init() {
 	const db = appDb();
 	await ensurePasswordSeeded(db, env.LIST_PASSWORD?.trim() || undefined);
+	ensureAiConfigSeeded(db, env.LIST_GEMINI_API_KEY?.trim() || undefined, env.LIST_GEMINI_MODEL?.trim() || undefined);
 
 	// Prefer an explicit secret from the container env; otherwise persist a generated
 	// one so sessions survive restarts even if the operator never set LIST_SECRET.

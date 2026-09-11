@@ -22,15 +22,15 @@ export async function verifyPassword(hash: string, pw: string): Promise<boolean>
 }
 
 /**
- * On boot: seed the shared password from LIST_PASSWORD, and rotate it if the env
- * value has changed since last boot (so `list.env` + restart is a working way to
- * change the password until there's a settings UI). If LIST_PASSWORD is unset,
- * whatever is already stored stays.
+ * First-run only: seed the shared password from LIST_PASSWORD. Once a password
+ * hash exists — whether from this seed or from the Settings page — LIST_PASSWORD
+ * is never consulted again, so an in-app password change survives the container
+ * being recreated. (Before the Settings page existed, this used to re-seed from
+ * env on every boot; that's gone now that there's a real way to change it.)
  */
 export async function ensurePasswordSeeded(db: DB, envPassword: string | undefined): Promise<void> {
+	if (getMeta(db, 'password_hash')) return; // already set — env only seeds a fresh install
 	if (!envPassword) return;
-	const stored = getMeta(db, 'password_hash') ?? '';
-	if (stored && (await verifyPassword(stored, envPassword))) return; // unchanged
 	setMeta(db, 'password_hash', await hashPassword(envPassword));
 }
 

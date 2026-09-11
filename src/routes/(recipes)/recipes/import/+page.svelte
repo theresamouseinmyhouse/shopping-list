@@ -6,6 +6,7 @@
 
 	let url = $state('');
 	let text = $state('');
+	let description = $state('');
 
 	let fileEl = $state<HTMLInputElement>();
 	let photoName = $state('');
@@ -29,8 +30,10 @@
 		'json-ld': 'structured data',
 		microdata: 'page markup',
 		text: 'the page text',
-		ai: 'AI'
+		ai: 'AI',
+		generated: 'AI'
 	};
+	const isGenerated = $derived(form?.method === 'generated');
 
 	const dualSnapshot = $state<{ id: string; name: string; main: string; alt: string }[]>([]);
 	$effect(() => {
@@ -84,7 +87,10 @@
 	</div>
 	<button class="btn btn-sm btn-primary" disabled={!allPicked} onclick={() => (choosing = false)}>Continue to editor</button>
 {:else if draft}
-	<p class="ok">Read from {methodLabel[form?.method ?? 'text']} — review and save.</p>
+	<p class="ok">
+		{#if isGenerated}Made up by AI from your description — review before you trust anything about it.
+		{:else}Read from {methodLabel[form?.method ?? 'text']} — review and save.{/if}
+	</p>
 	<RecipeEditor
 		initial={draft}
 		recipes={data.recipes}
@@ -148,6 +154,15 @@
 			<p class="hint">Needs an AI key (<code>LIST_GEMINI_API_KEY</code>). Not configured.</p>
 		{/if}
 	</form>
+
+	{#if data.ai}
+		<form method="POST" action="?/generate" class="box">
+			<h3>Make one up</h3>
+			<p class="hint">Describe what you want ("vegan bacon bits", "a quick weeknight chili") and AI will draft a whole recipe from scratch — not from any source. Review it like any other import.</p>
+			<textarea class="field" name="description" rows="2" bind:value={description} placeholder="vegan bacon bits"></textarea>
+			<button class="btn btn-sm btn-primary">Generate</button>
+		</form>
+	{/if}
 {/if}
 </Screen>
 

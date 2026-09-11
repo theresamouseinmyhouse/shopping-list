@@ -7,6 +7,7 @@
 	const p = $derived(page.url.pathname);
 	const chromeless = $derived(
 		p === '/login' ||
+			p === '/settings' ||
 			p === '/recipes/new' ||
 			p === '/recipes/import' ||
 			/^\/recipes\/[^/]+\/edit$/.test(p)

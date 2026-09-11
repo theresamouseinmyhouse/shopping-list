@@ -9,6 +9,7 @@
 	import ItemOptionsSheet from '$lib/client/ItemOptionsSheet.svelte';
 	import AddItemBox from '$lib/client/AddItemBox.svelte';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import Settings from '@lucide/svelte/icons/settings';
 	import { uuid } from '$lib/client/uuid';
 	import { parseAdd, singularizeName } from '$lib/quantity';
 	import { GLOBAL } from '$lib/types';
@@ -78,6 +79,9 @@
 <svelte:head><title>List</title></svelte:head>
 
 <Screen title="List">
+	{#snippet actions()}
+		<a class="btn-plain settings-link" href="/settings" aria-label="Settings"><Settings size={20} /></a>
+	{/snippet}
 	<div class="page">
 	{#if !stores.length && !loose.items.length && !view.checked.length}
 		<div class="firstrun">
@@ -168,6 +172,12 @@
 </footer>
 
 <style>
+	.settings-link {
+		display: grid;
+		place-items: center;
+		width: 2.4rem;
+		height: 2.4rem;
+	}
 	.page {
 		padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 4rem);
 	}

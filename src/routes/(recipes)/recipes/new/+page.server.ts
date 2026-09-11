@@ -7,7 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
 	const { db } = await instance();
-	return { recipes: listRecipes(db), catalog: catalogNames(db), ai: aiConfigured() };
+	return { recipes: listRecipes(db), catalog: catalogNames(db), ai: aiConfigured(db) };
 };
 
 export const actions: Actions = {

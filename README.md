@@ -15,6 +15,10 @@ Bottom tab bar with four views:
 
 Each place (store) is a separate, scoped view at `/stores/[id]` with its own drag-ordered list and quick-add. Every item remembers its position and hidden flag per place.
 
+A ⚙ in the List screen's header opens **Settings** — turn AI on/off, manage the
+Gemini key/model, one instruction appended to every AI call, and the household
+password.
+
 ## Stack
 
 SvelteKit (`adapter-node`) full-stack · `better-sqlite3` · Dexie outbox + `/api/sync`
@@ -74,11 +78,12 @@ response buffering on `/api/events` (nginx `proxy_buffering off;`).
 
 | var | default | purpose |
 |--|--|--|
-| `LIST_PASSWORD` | unset → set it on first visit | pre-seed the shared password; edit + restart to change it |
+| `LIST_PASSWORD` | unset → set it on first visit | pre-seeds the shared password on a **fresh** install only — once one's set (here or in Settings), change it from Settings in the app instead |
 | `LIST_SECRET` | generated, stored in the DB | session-cookie signing key; set it only to pin it into your backups |
 | `LIST_API_TOKEN` | unset → session required | bearer token for `POST /api/quick-add` (voice assistants, scripts) |
-| `LIST_GEMINI_API_KEY` | unset → AI import off | Gemini key for **Recipes → Import** from a photo, or a link with no structured data |
-| `LIST_GEMINI_MODEL` | `gemini-2.5-flash` | model used for AI import |
+| `LIST_GEMINI_API_KEY` | unset → AI off | pre-seeds AI on a **fresh** install only — Settings in the app owns the key/model/toggle/instructions after that |
+| `LIST_GEMINI_MODEL` | `gemini-2.5-flash` | model used for AI, until changed in Settings |
+| `BODY_SIZE_LIMIT` | `12M` | adapter-node's default (512K) is too small for a phone photo upload (Recipes → Import) |
 
 `cp list.env.example list.env`, uncomment what you need; compose reads it
 automatically.
@@ -109,8 +114,10 @@ volume. Back it up. To update: `docker compose pull && docker compose up -d`, or
   ingredient list; steps are prose and link to ingredients whose names they mention.
   Printable view, sub-recipes embedded inline. Import parses locally first (schema.org
   JSON-LD, microdata, then a plain-text heuristic); AI (`LIST_GEMINI_API_KEY`) is an
-  explicit fallback and only needed for photos or messy pages. "Add to list" pushes a
-  recipe (and its sub-recipes) onto the shopping list.
+  explicit fallback and only needed for photos or messy pages. "Make one up" skips
+  a source entirely — AI drafts a whole recipe from a short description, landing in
+  the same review-before-you-save editor as every other import. "Add to list" pushes
+  a recipe (and its sub-recipes) onto the shopping list.
 
 ## v1.1 ideas
 

@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		initial: fullRecipeToInput(db, full),
 		recipes: listRecipes(db).filter((r) => r.id !== params.id),
 		catalog: catalogNames(db),
-		ai: aiConfigured()
+		ai: aiConfigured(db)
 	};
 };
 
