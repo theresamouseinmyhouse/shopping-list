@@ -10,11 +10,50 @@
 
 	let fileEl = $state<HTMLInputElement>();
 	let photoName = $state('');
+	let compressing = $state(false);
 	function openPicker(camera: boolean) {
 		if (!fileEl) return;
 		if (camera) fileEl.setAttribute('capture', 'environment');
 		else fileEl.removeAttribute('capture');
 		fileEl.click();
+	}
+
+	const MAX_EDGE = 1600;
+
+	/** Downscale + re-encode as JPEG so a full-res phone photo doesn't time out on upload. */
+	async function compressPhoto(file: File): Promise<File> {
+		const bitmap = await createImageBitmap(file);
+		const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+		const w = Math.round(bitmap.width * scale);
+		const h = Math.round(bitmap.height * scale);
+		const canvas = new OffscreenCanvas(w, h);
+		const ctx = canvas.getContext('2d');
+		if (!ctx) throw new Error('no 2d context');
+		ctx.drawImage(bitmap, 0, 0, w, h);
+		const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
+		return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+	}
+
+	async function onPhotoPicked(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) {
+			photoName = '';
+			return;
+		}
+		compressing = true;
+		try {
+			const out = await compressPhoto(file);
+			const dt = new DataTransfer();
+			dt.items.add(out);
+			input.files = dt.files;
+			photoName = `${out.name} (${(file.size / 1e6).toFixed(1)} MB → ${(out.size / 1e6).toFixed(1)} MB)`;
+		} catch {
+			// compression unsupported/failed — fall back to the original file as picked
+			photoName = file.name;
+		} finally {
+			compressing = false;
+		}
 	}
 
 	let draft = $state<RecipeInput | null>(null);
@@ -142,14 +181,15 @@
 				type="file"
 				accept="image/*"
 				hidden
-				onchange={(e) => (photoName = e.currentTarget.files?.[0]?.name ?? '')}
+				onchange={onPhotoPicked}
 			/>
 			<div class="btnrow">
 				<button type="button" class="btn btn-sm" onclick={() => openPicker(true)}>📷 Take a photo</button>
 				<button type="button" class="btn btn-sm" onclick={() => openPicker(false)}>Choose a photo</button>
 			</div>
-			{#if photoName}<p class="hint">Selected: {photoName}</p>{/if}
-			<button class="btn btn-sm btn-primary" disabled={!photoName}>Read photo</button>
+			{#if compressing}<p class="hint">Compressing…</p>
+			{:else if photoName}<p class="hint">Selected: {photoName}</p>{/if}
+			<button class="btn btn-sm btn-primary" disabled={!photoName || compressing}>Read photo</button>
 		{:else}
 			<p class="hint">Needs an AI key (<code>LIST_GEMINI_API_KEY</code>). Not configured.</p>
 		{/if}
