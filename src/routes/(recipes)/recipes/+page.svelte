@@ -17,6 +17,7 @@
 		>
 			Prep only
 		</button>
+		<a class="btn btn-sm" href="/prep">Prep day</a>
 		<a class="btn btn-sm" href="/recipes/import">Import</a>
 		<a class="btn btn-sm btn-primary" href="/recipes/new">New</a>
 	{/snippet}
