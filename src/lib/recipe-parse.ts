@@ -283,6 +283,71 @@ export function parseMethod(text: string): {
 	return { steps, leadingIncludes };
 }
 
+export type StepSegment =
+	| { type: 'text'; text: string }
+	| { type: 'ingredient'; name: string; quantity: string; unit: string; quantity2: string; unit2: string }
+	| { type: 'timer'; label: string; quantity: string; unit: string }
+	| { type: 'comment'; text: string };
+
+const TOKEN_RE =
+	/@([a-zA-Z][\w' -]*?)\{([^}]*)\}|@([a-zA-Z][\w'-]*)|~([a-zA-Z][\w' -]*)?\{([^}]*)\}/g;
+
+function splitQtyUnit(inner: string): { q: string; u: string } {
+	const t = inner.trim();
+	if (!t) return { q: '', u: '' };
+	const i = t.indexOf('%');
+	return i < 0 ? { q: t, u: '' } : { q: t.slice(0, i).trim(), u: t.slice(i + 1).trim() };
+}
+
+/** Split a `body` string into an ordered walk of plain text / `@ingredient` /
+ *  `~timer` / trailing `-- comment` segments. Lossless over the non-token text. */
+export function tokenizeStepBody(body: string): StepSegment[] {
+	// a trailing " -- comment" (the LAST such marker) is pulled off before
+	// tokenizing the rest, so "--" inside earlier text is never mistaken for one
+	let core = body;
+	let comment = '';
+	const cIdx = body.lastIndexOf(' -- ');
+	if (cIdx >= 0) {
+		core = body.slice(0, cIdx).trimEnd();
+		comment = body.slice(cIdx + 4).trim();
+	}
+
+	const out: StepSegment[] = [];
+	let last = 0;
+	TOKEN_RE.lastIndex = 0;
+	let m: RegExpExecArray | null;
+	while ((m = TOKEN_RE.exec(core))) {
+		if (m.index > last) out.push({ type: 'text', text: core.slice(last, m.index) });
+		if (m[1] !== undefined) {
+			// braced ingredient: @name{inner}
+			const { q, u } = splitQtyUnitMain(m[2]);
+			out.push({ type: 'ingredient', name: m[1].trim(), quantity: q.quantity, unit: q.unit, quantity2: u.quantity, unit2: u.unit });
+		} else if (m[3] !== undefined) {
+			// bare ingredient: @name
+			out.push({ type: 'ingredient', name: m[3].trim(), quantity: '', unit: '', quantity2: '', unit2: '' });
+		} else {
+			// timer: ~label?{inner}
+			const { q } = splitQtyUnitMain(m[5]);
+			out.push({ type: 'timer', label: (m[4] ?? '').trim(), quantity: q.quantity, unit: q.unit });
+		}
+		last = TOKEN_RE.lastIndex;
+	}
+	if (last < core.length) out.push({ type: 'text', text: core.slice(last) });
+	if (comment) out.push({ type: 'comment', text: comment });
+	return out;
+}
+
+/** `"200%g"` -> main; `"1.5%cups|190%g"` -> main + alt (dual measure). */
+function splitQtyUnitMain(inner: string): {
+	q: { quantity: string; unit: string };
+	u: { quantity: string; unit: string };
+} {
+	const [mainRaw, altRaw] = inner.split('|');
+	const main = splitQtyUnit(mainRaw ?? '');
+	const alt = splitQtyUnit(altRaw ?? '');
+	return { q: { quantity: main.q, unit: main.u }, u: { quantity: alt.q, unit: alt.u } };
+}
+
 /** Back-compat name used by the import module. */
 export const parseRecipeText = parsePlainRecipe;
 

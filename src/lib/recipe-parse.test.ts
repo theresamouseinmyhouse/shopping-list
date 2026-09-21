@@ -7,7 +7,8 @@ import {
 	parsePlainRecipe,
 	serializeIngredients,
 	serializeMethod,
-	serializeRecipe
+	serializeRecipe,
+	tokenizeStepBody
 } from './recipe-parse';
 import { coerceRecipeInput } from './recipe';
 
@@ -184,5 +185,86 @@ describe('serialize round-trips', () => {
 			r.ingredients.map((i) => [i.quantity, i.unit, i.quantity2, i.unit2, i.name])
 		);
 		expect(back.steps.map((s) => s.body)).toEqual(r.steps.map((s) => s.body));
+	});
+});
+
+describe('tokenizeStepBody', () => {
+	it('splits plain text with no tokens into one text segment', () => {
+		expect(tokenizeStepBody('Preheat the oven.')).toEqual([
+			{ type: 'text', text: 'Preheat the oven.' }
+		]);
+	});
+
+	it('parses a braced ingredient token with quantity and unit', () => {
+		const segs = tokenizeStepBody('Fry @pancetta{200%g} until crispy.');
+		expect(segs).toEqual([
+			{ type: 'text', text: 'Fry ' },
+			{ type: 'ingredient', name: 'pancetta', quantity: '200', unit: 'g', quantity2: '', unit2: '' },
+			{ type: 'text', text: ' until crispy.' }
+		]);
+	});
+
+	it('parses a bare single-word ingredient token with no braces', () => {
+		const segs = tokenizeStepBody('Season with @salt.');
+		expect(segs).toEqual([
+			{ type: 'text', text: 'Season with ' },
+			{ type: 'ingredient', name: 'salt', quantity: '', unit: '', quantity2: '', unit2: '' },
+			{ type: 'text', text: '.' }
+		]);
+	});
+
+	it('parses a multi-word braced ingredient name', () => {
+		const segs = tokenizeStepBody('Add @ground beef{1%lb}.');
+		expect(segs[1]).toEqual({
+			type: 'ingredient', name: 'ground beef', quantity: '1', unit: 'lb', quantity2: '', unit2: ''
+		});
+	});
+
+	it('parses a dual-measure ingredient token', () => {
+		const segs = tokenizeStepBody('Whisk in @flour{1.5%cups|190%g}.');
+		expect(segs[1]).toEqual({
+			type: 'ingredient', name: 'flour', quantity: '1.5', unit: 'cups', quantity2: '190', unit2: 'g'
+		});
+	});
+
+	it('parses an anonymous timer', () => {
+		const segs = tokenizeStepBody('Add garlic for ~{30%seconds}.');
+		expect(segs[1]).toEqual({ type: 'timer', label: '', quantity: '30', unit: 'seconds' });
+	});
+
+	it('parses a named timer', () => {
+		const segs = tokenizeStepBody('Let it ~simmer{45%minutes} on low.');
+		expect(segs[1]).toEqual({ type: 'timer', label: 'simmer', quantity: '45', unit: 'minutes' });
+	});
+
+	it('recognizes a trailing comment at the end of the step only', () => {
+		const segs = tokenizeStepBody('Simmer beans until tender. -- canned beans work too');
+		expect(segs).toEqual([
+			{ type: 'text', text: 'Simmer beans until tender.' },
+			{ type: 'comment', text: 'canned beans work too' }
+		]);
+	});
+
+	it('does not treat a mid-sentence " -- " as a comment when more text follows', () => {
+		// "-- " only counts as a comment when it is the LAST such marker in the body
+		const segs = tokenizeStepBody('Do this -- carefully -- then that.');
+		expect(segs.filter((s) => s.type === 'comment')).toEqual([{ type: 'comment', text: 'then that.' }]);
+	});
+
+	it('handles a step with an ingredient, a timer, and a trailing comment together', () => {
+		const segs = tokenizeStepBody(
+			'Fry @pancetta{200%g} until crispy, then add @garlic{2%cloves} for ~{30%seconds}. -- watch it, garlic burns fast'
+		);
+		expect(segs.map((s) => s.type)).toEqual([
+			'text', 'ingredient', 'text', 'ingredient', 'text', 'timer', 'text', 'comment'
+		]);
+		expect(segs[segs.length - 1]).toEqual({ type: 'comment', text: 'watch it, garlic burns fast' });
+	});
+
+	it('ignores an empty-braced ingredient token (no quantity)', () => {
+		const segs = tokenizeStepBody('Season the @chicken breast{}.');
+		expect(segs[1]).toEqual({
+			type: 'ingredient', name: 'chicken breast', quantity: '', unit: '', quantity2: '', unit2: ''
+		});
 	});
 });
