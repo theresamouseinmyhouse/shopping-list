@@ -44,7 +44,7 @@ The class names `.btn`, `.field`, `.group`, `.row`, `.list`, `.caption` are **re
 
 ### `BottomTabBar.svelte`
 Fixed 4-tab bar at the bottom: List (`/`) · Stores (`/stores`) · Items (`/catalog`) · Recipes (`/recipes`). Active tab highlights via icon weight + accent color. 
-- On every route **except** `/login`, `/recipes/new`, `/recipes/import`, `/recipes/<id>/edit` (the chromeless set).
+- On every route **except** `/login`, `/recipes/new`, `/recipes/import`, `/recipes/<id>/edit`, `/prep` (the chromeless set).
 - Rendered in root `(app)/+layout.svelte`.
 
 ### `Screen.svelte`

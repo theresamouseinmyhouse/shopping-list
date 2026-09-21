@@ -111,13 +111,19 @@ volume. Back it up. To update: `docker compose pull && docker compose up -d`, or
 - `recipes` / `recipe_steps` / `recipe_ingredients` / `recipe_links` /
   `recipe_step_ingredients` / `item_aliases` — a small **method-first** recipe keeper
   at `/recipes` (server-rendered, online-only, **not** synced). One canonical
-  ingredient list; steps are prose and link to ingredients whose names they mention.
-  Printable view, sub-recipes embedded inline. Import parses locally first (schema.org
-  JSON-LD, microdata, then a plain-text heuristic); AI (`LIST_GEMINI_API_KEY`) is an
-  explicit fallback and only needed for photos or messy pages. "Make one up" skips
+  ingredient list; steps are prose carrying inline Cooklang-derivative tokens
+  (`@ingredient{qty%unit}`, `~{timer}`, a trailing `-- comment`) that link an
+  ingredient exactly where a step uses it — authored by selecting text in the step
+  editor and picking a token type, or written automatically by AI import (see
+  below). Printable view, sub-recipes embedded inline. Import parses locally first
+  (schema.org JSON-LD, microdata, then a plain-text heuristic); AI
+  (`LIST_GEMINI_API_KEY`) is an explicit fallback and only needed for photos or
+  messy pages, and now emits the token grammar directly. "Make one up" skips
   a source entirely — AI drafts a whole recipe from a short description, landing in
   the same review-before-you-save editor as every other import. "Add to list" pushes
-  a recipe (and its sub-recipes) onto the shopping list.
+  a recipe (and its sub-recipes) onto the shopping list. A recipe can be flagged as a
+  weekend batch-prep recipe; `/prep` picks your flagged recipes, shows the combined
+  ingredient list, and adds what's missing to the shopping list.
 
 ## v1.1 ideas
 
