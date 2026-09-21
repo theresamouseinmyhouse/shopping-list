@@ -1,17 +1,13 @@
 <script lang="ts">
 	import { untrack, tick } from 'svelte';
-	import {
-		displayAmount,
-		matchIngredientsInProse,
-		type RecipeInput
-	} from '$lib/recipe';
+	import { displayAmount, type RecipeInput } from '$lib/recipe';
 	import { normalizeName } from '$lib/types';
 	import {
 		parseIngredientsBlock,
-		parseMethod,
-		serializeIngredients,
-		serializeMethod
+		linkStepIngredients,
+		serializeIngredients
 	} from '$lib/recipe-parse';
+	import StepEditor from './StepEditor.svelte';
 
 	let {
 		initial,
@@ -36,12 +32,21 @@
 	let sourceUrl = $state(seed.source_url);
 	let isPrep = $state(seed.is_prep);
 	let ingredientsText = $state(serializeIngredients(seed.ingredients, seed.miseEnPlaceIncludes));
-	let methodText = $state(
-		serializeMethod(seed.steps.map((s) => ({ body: s.body, group: s.group, includes: s.includes })))
+
+	type EditableStep = { body: string; group: string; ingredientIds: string[]; includes: string[] };
+	let steps = $state<EditableStep[]>(
+		seed.steps.length
+			? seed.steps.map((s) => ({
+					body: s.body,
+					group: s.group,
+					ingredientIds: s.ingredientIds,
+					includes: s.includes
+				}))
+			: [{ body: '', group: '', ingredientIds: [], includes: [] }]
 	);
 
 	const parsedIng = $derived(parseIngredientsBlock(ingredientsText));
-	const parsedMethod = $derived(parseMethod(methodText));
+	const linked = $derived(linkStepIngredients(parsedIng.ingredients, steps));
 
 	const payload = $derived(
 		JSON.stringify({
@@ -50,16 +55,15 @@
 			notes,
 			source_url: sourceUrl,
 			is_prep: isPrep,
-			ingredients: parsedIng.ingredients,
-			miseEnPlaceIncludes: [...parsedIng.includes, ...parsedMethod.leadingIncludes],
-			steps: parsedMethod.steps
+			ingredients: linked.ingredients,
+			miseEnPlaceIncludes: parsedIng.includes,
+			steps: linked.steps
 		} satisfies RecipeInput)
 	);
 
-	// ---- "+ " sub-recipe autocomplete inside the textareas -------------------
+	// ---- "+ " sub-recipe autocomplete inside the ingredients textarea --------
 	let ingEl = $state<HTMLTextAreaElement>();
-	let methodEl = $state<HTMLTextAreaElement>();
-	let subTarget = $state<'ing' | 'method' | null>(null);
+	let subTarget = $state<'ing' | null>(null);
 	let subQuery = $state('');
 	let subIndex = $state(0);
 	const recipeTitleSet = $derived(new Set(recipes.map((r) => normalizeName(r.title))));
@@ -81,12 +85,11 @@
 		return { start, end, line: v.slice(start, end) };
 	}
 
-	function onTextareaInput(which: 'ing' | 'method') {
-		const ta = which === 'ing' ? ingEl : methodEl;
-		if (!ta) return;
-		const m = lineRange(ta).line.match(/^\s*\+[ \t]*(.*)$/);
+	function onTextareaInput() {
+		if (!ingEl) return;
+		const m = lineRange(ingEl).line.match(/^\s*\+[ \t]*(.*)$/);
 		if (m) {
-			subTarget = which;
+			subTarget = 'ing';
 			subQuery = m[1];
 			subIndex = 0;
 		} else {
@@ -95,13 +98,12 @@
 	}
 
 	async function pickSub(title: string) {
-		const ta = subTarget === 'ing' ? ingEl : methodEl;
+		const ta = ingEl;
 		if (!ta) return;
 		const { start, end } = lineRange(ta);
 		const newLine = `+ ${title}`;
 		const next = ta.value.slice(0, start) + newLine + ta.value.slice(end);
-		if (subTarget === 'ing') ingredientsText = next;
-		else methodText = next;
+		ingredientsText = next;
 		subTarget = null;
 		await tick();
 		ta.focus();
@@ -117,11 +119,10 @@
 	}
 
 	/** insert `prefix` on a fresh line at the cursor (reusing the current line if blank) */
-	async function insertLine(which: 'ing' | 'method', prefix: string, openSub = false) {
-		const ta = which === 'ing' ? ingEl : methodEl;
+	async function insertLine(prefix: string, openSub = false) {
+		const ta = ingEl;
 		if (!ta) return;
-		const isIng = which === 'ing';
-		const text = isIng ? ingredientsText : methodText;
+		const text = ingredientsText;
 		const pos = ta.selectionStart ?? text.length;
 		const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
 		let lineEnd = text.indexOf('\n', pos);
@@ -131,20 +132,9 @@
 		const ins = lineEmpty ? prefix : '\n' + prefix;
 		const caret = at + ins.length;
 		const next = text.slice(0, at) + ins + text.slice(at);
-		if (isIng) ingredientsText = next;
-		else methodText = next;
+		ingredientsText = next;
 		await focusCaret(ta, caret);
-		if (openSub) onTextareaInput(which);
-	}
-
-	/** method only: blank line = new step */
-	async function newStep() {
-		if (!methodEl) return;
-		const pos = methodEl.selectionStart ?? methodText.length;
-		const before = methodText.slice(0, pos).replace(/\s+$/, '');
-		const after = methodText.slice(pos).replace(/^\s+/, '');
-		methodText = `${before}\n\n${after}`;
-		await focusCaret(methodEl, before.length + 2);
+		if (openSub) onTextareaInput();
 	}
 
 	function onSubKeydown(e: KeyboardEvent) {
@@ -163,11 +153,11 @@
 		}
 	}
 
-	// includes typed in the textareas that don't match any known recipe
+	// includes typed in the ingredients textarea or step bodies that don't
+	// match any known recipe
 	const unresolved = $derived([
 		...parsedIng.includes,
-		...parsedMethod.leadingIncludes,
-		...parsedMethod.steps.flatMap((s) => s.includes)
+		...linked.steps.flatMap((s) => s.includes)
 	].filter((t) => t && !recipeTitleSet.has(normalizeName(t))));
 
 	function chip(i: (typeof parsedIng.ingredients)[number]) {
@@ -175,10 +165,6 @@
 		const amt = d.alt ? `${d.main} (${d.alt})` : d.main;
 		return `${amt ? amt + ' ' : ''}${i.name}${i.comment ? ` · ${i.comment}` : ''}`.trim();
 	}
-	const proseIds = (body: string) =>
-		matchIngredientsInProse(body, parsedIng.ingredients).map(
-			(id) => parsedIng.ingredients.find((x) => x.id === id)!
-		);
 
 	let tidyOpen = $state(false);
 	let tidyInstruction = $state('');
@@ -199,9 +185,12 @@
 			servings = recipe.servings || servings;
 			if (recipe.notes) notes = recipe.notes;
 			ingredientsText = serializeIngredients(recipe.ingredients, recipe.miseEnPlaceIncludes);
-			methodText = serializeMethod(
-				recipe.steps.map((s) => ({ body: s.body, group: s.group, includes: s.includes }))
-			);
+			steps = recipe.steps.map((s) => ({
+				body: s.body,
+				group: s.group,
+				ingredientIds: s.ingredientIds,
+				includes: s.includes
+			}));
 			tidyOpen = false;
 			tidyInstruction = '';
 		} catch (e) {
@@ -230,11 +219,11 @@
 	<label class="fieldrow"><span>Notes</span><textarea class="field" bind:value={notes}></textarea></label>
 
 	<section class="card">
-		<h3>Ingredients</h3>
-		<p class="hint">One per line: <code>1 1/2 cups flour (sifted)</code>. <code>2 lb | 900 g</code> for two measures.</p>
+		<h3>Other ingredients</h3>
+		<p class="hint">Anything not named in a step (e.g. "cooking spray"). Most ingredients belong in the steps below instead — select the word there and mark it as an ingredient.</p>
 		<div class="mkbar">
-			<button type="button" class="mk-btn" onclick={() => insertLine('ing', '## ')}>＋ Group heading</button>
-			<button type="button" class="mk-btn" onclick={() => insertLine('ing', '+ ', true)}>＋ Sub-recipe</button>
+			<button type="button" class="mk-btn" onclick={() => insertLine('## ')}>＋ Group heading</button>
+			<button type="button" class="mk-btn" onclick={() => insertLine('+ ', true)}>＋ Sub-recipe</button>
 		</div>
 		<div class="ta-wrap">
 			<textarea
@@ -242,9 +231,9 @@
 				bind:value={ingredientsText}
 				bind:this={ingEl}
 				spellcheck="false"
-				oninput={() => onTextareaInput('ing')}
+				oninput={onTextareaInput}
 				onkeydown={onSubKeydown}
-				onclick={() => onTextareaInput('ing')}
+				onclick={onTextareaInput}
 				onblur={() => setTimeout(() => (subTarget === 'ing' ? (subTarget = null) : null), 150)}
 			></textarea>
 			{#if subTarget === 'ing' && subMatches.length}
@@ -271,49 +260,23 @@
 
 	<section class="card">
 		<h3>Method</h3>
-		<p class="hint">Write the steps as prose — one step per paragraph. Name ingredients where you use them and they link automatically.</p>
+		<p class="hint">
+			Write each step, then select a word or phrase to mark it as an ingredient, a
+			timer, or a note. Ingredients get linked automatically — no need to also list
+			them below unless a step doesn't mention one by name.
+		</p>
+		{#each steps as step, i (i)}
+			<div class="stepwrap">
+				{#if step.group}<span class="grp">{step.group}</span>{/if}
+				<StepEditor bind:body={step.body} catalog={parsedIng.ingredients.map((x) => x.name)} placeholder={`Step ${i + 1}…`} />
+				<div class="steprow-actions">
+					<button type="button" class="mk-btn" onclick={() => (steps = steps.filter((_, k) => k !== i))} disabled={steps.length === 1}>Remove step</button>
+				</div>
+			</div>
+		{/each}
 		<div class="mkbar">
-			<button type="button" class="mk-btn" onclick={newStep}>＋ Step</button>
-			<button type="button" class="mk-btn" onclick={() => insertLine('method', '## ')}>＋ Section</button>
-			<button type="button" class="mk-btn" onclick={() => insertLine('method', '+ ', true)}>＋ Sub-recipe</button>
+			<button type="button" class="mk-btn" onclick={() => (steps = [...steps, { body: '', group: '', ingredientIds: [], includes: [] }])}>＋ Step</button>
 		</div>
-		<div class="ta-wrap">
-			<textarea
-				class="field big"
-				bind:value={methodText}
-				bind:this={methodEl}
-				oninput={() => onTextareaInput('method')}
-				onkeydown={onSubKeydown}
-				onclick={() => onTextareaInput('method')}
-				onblur={() => setTimeout(() => (subTarget === 'method' ? (subTarget = null) : null), 150)}
-			></textarea>
-			{#if subTarget === 'method' && subMatches.length}
-				<ul class="subdrop">
-					{#each subMatches as r, k (r.id)}
-						<li>
-							<button type="button" class:on={k === subIndex} onmousedown={(e) => { e.preventDefault(); pickSub(r.title); }}>
-								{r.title}
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-		{#if parsedMethod.steps.length}
-			<ol class="steps">
-				{#each parsedMethod.steps as s, i (i)}
-					<li>
-						{#if s.group}<span class="grp">{s.group}</span>{/if}
-						<span class="stepbody">{s.body}</span>
-						{#if proseIds(s.body).length}
-							<span class="uses">
-								{#each proseIds(s.body) as ing (ing.id)}<span class="tag sm">{[ing.quantity, ing.unit].filter(Boolean).join(' ')} {ing.name}</span>{/each}
-							</span>
-						{/if}
-					</li>
-				{/each}
-			</ol>
-		{/if}
 	</section>
 
 	{#if unresolved.length}
@@ -361,7 +324,6 @@
 	.card { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.card h3 { margin: 0; font-size: 0.95rem; }
 	.hint { margin: 0; font-size: 0.76rem; color: var(--text-2); line-height: 1.5; }
-	.hint code { background: var(--surface-2); border-radius: 0.25rem; padding: 0 0.25rem; }
 	.mkbar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 	.mk-btn {
 		font-size: 0.75rem;
@@ -377,7 +339,6 @@
 	.preview { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 	.tag { background: var(--surface-2); border-radius: 999px; padding: 0.12rem 0.6rem; font-size: 0.8rem; }
 	.tag.linked { background: var(--accent-weak); }
-	.tag.sm { font-size: 0.72rem; padding: 0.05rem 0.45rem; }
 	.ta-wrap { position: relative; }
 	.subdrop {
 		position: absolute;
@@ -419,11 +380,9 @@
 		margin: 0;
 	}
 	.warn code { background: color-mix(in srgb, var(--danger) 18%, transparent); border-radius: 0.25rem; padding: 0 0.2rem; }
-	.steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.5rem; }
-	.steps li { font-size: 0.85rem; }
 	.grp { display: block; font-weight: 600; color: var(--text-3); font-size: 0.75rem; text-transform: uppercase; }
-	.stepbody { color: var(--text-2); }
-	.uses { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+	.stepwrap { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.6rem; }
+	.steprow-actions { display: flex; justify-content: flex-end; }
 	.actions { position: sticky; bottom: 0; background: var(--surface-1); padding: 0.6rem 0; border-top: 1px solid var(--line); display: flex; gap: 0.5rem; }
 	.actions .btn-primary { flex: 1; padding: 0.6rem; }
 	.tidyerr { color: var(--danger); font-size: 0.82rem; margin: 0.3rem 0; }
