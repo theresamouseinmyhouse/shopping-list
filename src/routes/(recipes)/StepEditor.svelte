@@ -4,7 +4,11 @@
 	let { body = $bindable(''), placeholder = 'Write this step…' }: { body: string; placeholder?: string } = $props();
 
 	let el = $state<HTMLDivElement>();
-	let composing = false; // true while the user is actively typing in this block
+	// the last value WE derived from the DOM via onInput — if `body` still equals
+	// this, the effect's dependency changed only because of our own edit, so the
+	// DOM is already correct and must not be rewritten (that would reset the
+	// caret). `undefined` on mount guarantees the very first render still runs.
+	let lastEmitted: string | undefined;
 
 	function segToToken(seg: StepSegment): string {
 		if (seg.type === 'ingredient') {
@@ -51,16 +55,15 @@
 
 	function onInput() {
 		if (!el) return;
-		composing = true;
-		body = serialize(el);
-		composing = false;
+		lastEmitted = serialize(el);
+		body = lastEmitted;
 	}
 
 	// keep the DOM in sync when `body` changes from outside this component
 	// (e.g. a toolbar action elsewhere, or the initial load) — but never while
 	// the user is mid-edit here, or the caret would jump.
 	$effect(() => {
-		if (!el || composing) return;
+		if (!el || body === lastEmitted) return;
 		const wanted = render(body);
 		if (el.innerHTML !== wanted) el.innerHTML = wanted;
 	});
