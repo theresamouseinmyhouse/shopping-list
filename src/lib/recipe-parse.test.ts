@@ -313,3 +313,21 @@ describe('linkStepIngredients', () => {
 		expect(out[0].ingredientIds).toHaveLength(2);
 	});
 });
+
+describe('parsePlainRecipe with inline tokens', () => {
+	it('links an ingredient declared only via an inline @ token in the method', () => {
+		const text = `Title: Carbonara
+
+@ingredients
+400 g spaghetti
+
+@method
+Fry @pancetta{200%g} until crispy, then toss with the spaghetti.`;
+		const draft = parsePlainRecipe(text);
+		const pancetta = draft.ingredients.find((i) => i.name === 'pancetta');
+		expect(pancetta).toBeTruthy();
+		expect(pancetta?.quantity).toBe('200');
+		expect(pancetta?.unit).toBe('g');
+		expect(draft.steps[0].ingredientIds).toContain(pancetta!.id);
+	});
+});

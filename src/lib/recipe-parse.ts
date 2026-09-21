@@ -216,9 +216,10 @@ export function parsePlainRecipe(text: string): RecipeInput {
 	}
 
 	const ingParsed = parseIngredientsBlock(ingredientText);
-	out.ingredients = ingParsed.ingredients;
 	const method = parseMethod(methodText);
-	out.steps = method.steps;
+	const linked = linkStepIngredients(ingParsed.ingredients, method.steps);
+	out.ingredients = linked.ingredients;
+	out.steps = linked.steps;
 	out.miseEnPlaceIncludes = [...ingParsed.includes, ...method.leadingIncludes];
 	return out;
 }
