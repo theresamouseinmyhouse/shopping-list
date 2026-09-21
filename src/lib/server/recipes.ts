@@ -275,16 +275,19 @@ export function saveRecipe(db: DB, id: string | null, input: RecipeInput): strin
 			);
 		});
 
-		// step <-> ingredient links: prose mentions + explicit picks
+		// step <-> ingredient links: explicit @token picks always; fuzzy prose-guessing
+		// only as a fallback for steps with NO explicit links (non-AI import paths —
+		// JSON-LD, microdata, pasted text — never carry tokens, so every one of their
+		// steps takes this branch; a fully-tokenized step skips guessing entirely).
 		const insSI = db.prepare(
 			`INSERT OR IGNORE INTO recipe_step_ingredients (step_id, ingredient_id, ord) VALUES (?, ?, ?)`
 		);
 		input.steps.forEach((s, si) => {
-			const fromProse = matchIngredientsInProse(s.body, savedIngredients);
 			const explicit = s.ingredientIds
 				.map((tid) => rowIdOf.get(tid))
 				.filter((x): x is string => !!x);
-			[...new Set([...fromProse, ...explicit])].forEach((rid, k) => insSI.run(stepIds[si], rid, k));
+			const linked = explicit.length ? explicit : matchIngredientsInProse(s.body, savedIngredients);
+			[...new Set(linked)].forEach((rid, k) => insSI.run(stepIds[si], rid, k));
 		});
 
 		// sub-recipe links

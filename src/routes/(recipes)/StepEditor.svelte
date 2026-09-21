@@ -120,6 +120,12 @@
 
 	const DURATION_RE = /(\d+(?:\.\d+)?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)/i;
 
+	/** the token grammar's ingredient-name charset (tokenizeStepBody's regex) —
+	 *  strip anything else so a messy selection can't produce an unparseable token */
+	function sanitizeIngredientName(raw: string): string {
+		return raw.replace(/[^a-zA-Z0-9_' -]/g, ' ').replace(/\s+/g, ' ').trim();
+	}
+
 	function markTimer() {
 		if (!toolbar) return;
 		const m = toolbar.text.match(DURATION_RE);
@@ -130,10 +136,15 @@
 
 	function markIngredient() {
 		if (!toolbar) return;
+		const name = sanitizeIngredientName(toolbar.text);
+		if (!name) {
+			toolbar = null;
+			return;
+		}
 		// quantity/unit default empty — the user (or AI) rarely hand-annotates a
 		// quantity via selection; this exists for quick "link this word" cases.
 		// Fine-grained qty/unit entry happens through AI import in practice.
-		wrapSelectionWithChip(`@${toolbar.text}{}`, toolbar.text, 'chip-ing');
+		wrapSelectionWithChip(`@${name}{}`, name, 'chip-ing');
 	}
 
 	function markNote() {

@@ -2,6 +2,10 @@
 // pass so it picks up the new @ingredient/~timer/--comment token grammar.
 // Usage: LIST_DB_PATH=./data/list.db npx vite-node -c vite.config.scripts.ts scripts/reparse-recipes-to-tokens.ts
 //
+// Back up list.db before running this against a real database — it rewrites
+// every recipe row. (Notes and the is_prep flag are now preserved across the
+// AI tidy pass; this is about the AI rewrite itself, not a known data-loss bug.)
+//
 // Must run under vite-node, not tsx/ts-node: src/lib/server/migrations.ts
 // imports the migration .sql files with a Vite-only `?raw` specifier, which
 // plain Node module resolution cannot handle.
@@ -27,7 +31,7 @@ async function main() {
 		const input = fullRecipeToInput(db, full);
 		try {
 			const tidied = await tidyRecipe(db, input, '');
-			saveRecipe(db, row.id, tidied);
+			saveRecipe(db, row.id, { ...tidied, notes: input.notes, is_prep: input.is_prep });
 			console.log(`  ok: ${row.title}`);
 		} catch (e) {
 			console.error(`  FAILED: ${row.title} — ${e instanceof Error ? e.message : e}`);

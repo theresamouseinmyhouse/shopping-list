@@ -5,7 +5,8 @@
 	import {
 		parseIngredientsBlock,
 		linkStepIngredients,
-		serializeIngredients
+		serializeIngredients,
+		tokenizeStepBody
 	} from '$lib/recipe-parse';
 	import StepEditor from './StepEditor.svelte';
 
@@ -31,7 +32,19 @@
 	let notes = $state(seed.notes);
 	let sourceUrl = $state(seed.source_url);
 	let isPrep = $state(seed.is_prep);
-	let ingredientsText = $state(serializeIngredients(seed.ingredients, seed.miseEnPlaceIncludes));
+	const tokenizedNames = new Set(
+		seed.steps.flatMap((s) =>
+			tokenizeStepBody(s.body)
+				.filter((seg) => seg.type === 'ingredient')
+				.map((seg) => normalizeName(seg.name))
+		)
+	);
+	let ingredientsText = $state(
+		serializeIngredients(
+			seed.ingredients.filter((i) => !tokenizedNames.has(normalizeName(i.name))),
+			seed.miseEnPlaceIncludes
+		)
+	);
 
 	type EditableStep = { body: string; group: string; ingredientIds: string[]; includes: string[] };
 	let steps = $state<EditableStep[]>(
