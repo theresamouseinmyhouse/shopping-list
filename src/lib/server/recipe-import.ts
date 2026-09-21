@@ -17,23 +17,22 @@ Title: <name>
 Serves: <yield, optional>
 
 @ingredients
-## For the cake
-1 1/2 cups | 190 g  all-purpose flour (sifted)
-1 tsp  fine salt
-3  large eggs, beaten
+1 tsp fine salt
 
 @method
-## Make the batter
-Cream the butter and sugar until pale. Beat in the eggs one at a time.
-Fold in the flour and salt.
+Fry @pancetta{200%g} until crispy, then add @garlic{2%cloves} for ~{30%seconds}.
+
+Fold in the @flour{1.5%cups|190%g} and salt. -- if the dough looks dry, add a splash of water
 
 Bake at 350F for 25 minutes.
 
 Rules:
-- List EVERY ingredient once, under @ingredients, quantity first then unit then name ("2 tbsp butter", "1 onion").
-- Put prep notes in parentheses or after a comma ("(sifted)", ", beaten") so the name stays plain.
-- If the source gives an ingredient two ways (weight AND volume), put both separated by " | ": "1 1/2 cups | 190 g  flour".
-- Under @method, write the steps as normal prose, one step per paragraph (blank line between). Name the ingredients in the prose where they are used — do not add a separate list.
+- Every ingredient used in a step is written INLINE in the step, as \`@name{qty%unit}\` right where it's used — e.g. "Fry @pancetta{200%g} until crispy." Do NOT also repeat it under @ingredients.
+- Only put an ingredient under @ingredients if it genuinely isn't named in any step (rare — e.g. "cooking spray").
+- A multi-word ingredient name still goes inside the braces: \`@ground beef{1%lb}\`, not \`@ground @beef\`.
+- If the source gives an ingredient two ways (weight AND volume), use both inside one token separated by "|": \`@flour{1.5%cups|190%g}\`.
+- Mark a meaningful wait/cook time as a timer: \`~{30%seconds}\` (anonymous) or \`~simmer{45%minutes}\` (named) — right where it occurs in the sentence.
+- Keep each step SHORT and DIRECT — one clear instruction. If there's extra detail (a tip, a substitution, "why"), put it in a trailing comment at the END of the step only: "Simmer until tender. -- canned beans work fine too." Never put that extra detail in the middle of the instruction sentence.
 - "## " lines are section headers (e.g. "For the sauce"); use them in both blocks when the recipe has parts.
 - Standard unit abbreviations: tsp, tbsp, cup, g, kg, oz, lb, ml, l.
 - Do not invent quantities, ingredients, or steps not in the source.`;
@@ -63,19 +62,21 @@ async function fetchHtml(rawUrl: string): Promise<{ url: URL; html: string }> {
 }
 
 const REFINE_PROMPT = `A recipe has already been roughly parsed. Below is that parse, then the original source. Return a CORRECTED version in the same format — fix only what the parse got wrong:
-- merge duplicated ingredients; split any that were run together onto one line
-- move prep words ("minced", "sifted", "at room temperature") out of the name, into parentheses
-- an ingredient shown the same way twice ("500 g | 17.6 oz", "300 ml | 10 fl oz") should keep ONLY the metric measure; keep genuine "cups | grams" (volume + weight) pairs
+- if an ingredient appears under @ingredients AND is also used in a step, move it: delete the @ingredients line and instead write it inline in that step as \`@name{qty%unit}\`, right where the step uses it. Only leave an ingredient under @ingredients if no step names it.
+- merge duplicated ingredients; split any that were run together
+- move prep words ("minced", "sifted", "at room temperature") out of the name, into parentheses in the ingredient's own line/token
+- an ingredient shown the same way twice ("500 g | 17.6 oz") should keep ONLY the metric measure inside its \`@name{qty%unit}\` token; keep a genuine "cups | grams" pair as \`@name{1.5%cups|190%g}\`
 - correct a wrong or missing Title / Serves
-- make sure every ingredient named in the method also appears under @ingredients
-- keep the method wording; only fix its structure (one step per paragraph)
+- keep each step short and direct; if the source has extra detail beyond the core instruction, move it to a trailing \`-- comment\` at the END of that step, not mid-sentence
+- mark a meaningful wait/cook time as \`~{qty%unit}\` or \`~label{qty%unit}\` right where it occurs
 Do not add anything the source does not support.`;
 
 const TIDY_PROMPT = `Tidy this recipe. Return the same format. Only:
-- normalise units and quantities; if an ingredient lists the same measure twice ("500 g | 17.6 oz") keep only the metric one
-- move prep words out of ingredient names into parentheses
+- normalise units and quantities; if an ingredient lists the same measure twice ("500 g | 17.6 oz") keep only the metric one inside its @{} token
+- move prep words out of ingredient names into parentheses on the ingredient's own line/token
 - fix obvious typos and tighten step wording WITHOUT changing meaning or quantities
-- ensure every ingredient the steps mention is under @ingredients
+- if an ingredient is listed under @ingredients but also used in a step, move it inline into that step as \`@name{qty%unit}\` and remove the @ingredients line
+- keep each step short and direct; move any extra detail to a trailing \`-- comment\` at the end of that step
 Keep all real content — do not drop or invent ingredients or steps.`;
 
 const TIDY_INSTRUCTION_PROMPT = (instruction: string) =>
@@ -85,7 +86,8 @@ CHANGE REQUESTED: ${instruction}
 
 Notes:
 - If the change is a unit conversion, use any equivalent already shown in parentheses (e.g. "(368 grams)"); otherwise convert using standard cooking equivalents.
-- Keep every ingredient and step unless the change explicitly requires removing one.`;
+- Keep every ingredient and step unless the change explicitly requires removing one.
+- Keep every ingredient reference inline as \`@name{qty%unit}\` in the step that uses it, and any timer as \`~{qty%unit}\`.`;
 
 // ---------------------------------------------------------------------------
 // URL / text import — deterministic parser, never calls AI
@@ -184,19 +186,22 @@ Title: <name>
 Serves: <yield>
 
 @ingredients
-1 1/2 cups | 190 g  all-purpose flour (sifted)
-1 tsp  fine salt
+1 tsp fine salt
 
 @method
-Cream the butter and sugar until pale. Beat in the eggs one at a time.
+Fry @pancetta{200%g} until crispy, then add @garlic{2%cloves} for ~{30%seconds}.
+
+Fold in the @flour{1.5%cups|190%g} and salt. -- if the dough looks dry, add a splash of water
 
 Bake at 350F for 25 minutes.
 
 Rules:
-- List EVERY ingredient once, under @ingredients, quantity first then unit then name ("2 tbsp butter", "1 onion").
-- Put prep notes in parentheses or after a comma so the name stays plain.
-- Give a weight AND volume for a baking ingredient where that's normal, separated by " | ": "1 1/2 cups | 190 g flour".
-- Under @method, write the steps as normal prose, one step per paragraph (blank line between). Name the ingredients in the prose where they are used — do not add a separate list.
+- Every ingredient used in a step is written INLINE in the step, as \`@name{qty%unit}\` right where it's used — e.g. "Fry @pancetta{200%g} until crispy." Do NOT also repeat it under @ingredients.
+- Only put an ingredient under @ingredients if it genuinely isn't named in any step (rare — e.g. "cooking spray").
+- A multi-word ingredient name still goes inside the braces: \`@ground beef{1%lb}\`, not \`@ground @beef\`.
+- Give a weight AND volume for a baking ingredient where that's normal, using both inside one token separated by "|": \`@flour{1.5%cups|190%g}\`.
+- Mark a meaningful wait/cook time as a timer: \`~{30%seconds}\` (anonymous) or \`~simmer{45%minutes}\` (named) — right where it occurs in the sentence.
+- Keep each step SHORT and DIRECT — one clear instruction. If there's extra detail (a tip, a substitution, "why"), put it in a trailing comment at the END of the step only: "Simmer until tender. -- canned beans work fine too." Never put that extra detail in the middle of the instruction sentence.
 - "## " lines are section headers; use them if the recipe has clear parts (e.g. "For the sauce").
 - Standard unit abbreviations: tsp, tbsp, cup, g, kg, oz, lb, ml, l.
 - Prefer a well-established version of the dish (sensible ratios, real technique, plausible timing) over an untested invention.`;

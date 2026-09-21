@@ -8,6 +8,7 @@ import {
 	importFromText,
 	ImportError
 } from './recipe-import';
+import { parsePlainRecipe } from '../recipe-parse';
 
 const wrap = (ld: object) =>
 	`<html><head><script type="application/ld+json">${JSON.stringify(ld)}</script></head><body>x</body></html>`;
@@ -98,6 +99,34 @@ describe('importFromText', () => {
 		expect(r.method).toBe('text');
 		expect(r.draft.ingredients.map((i) => i.name)).toEqual(['flour', 'salt']);
 		expect(r.thin).toBe(false);
+	});
+});
+
+describe('parsePlainRecipe on an AI response (inline token grammar)', () => {
+	it('links an inline @ingredient{qty%unit} token to the step that names it', () => {
+		// Shaped like what GEMINI_PROMPT now asks Gemini to emit: no separate
+		// @ingredients listing for a step-used ingredient, just the inline token.
+		const r = parsePlainRecipe(
+			`Title: Garlic Pancetta\nServes: 2\n\n@ingredients\n1 tsp salt\n\n@method\nFry @pancetta{200%g} until crispy, then add @garlic{2%cloves} for ~{30%seconds}.\n\nSeason with the salt.`
+		);
+		expect(r.title).toBe('Garlic Pancetta');
+		const byName = Object.fromEntries(r.ingredients.map((i) => [i.name, i]));
+		expect(byName.pancetta).toMatchObject({ quantity: '200', unit: 'g' });
+		expect(byName.garlic).toMatchObject({ quantity: '2', unit: 'clove' });
+		// declared under @ingredients (never referenced via an inline @token), so it
+		// is NOT linked to a step's ingredientIds — prose mentions alone don't link
+		expect(byName.salt).toMatchObject({ quantity: '1', unit: 'tsp' });
+
+		expect(r.steps).toHaveLength(2);
+		expect(r.steps[0].ingredientIds.sort()).toEqual(
+			[byName.pancetta.id, byName.garlic.id].sort()
+		);
+		expect(r.steps[1].ingredientIds).toEqual([]);
+
+		// the raw token syntax is preserved in step.body verbatim (tokenizeStepBody
+		// walks it at render/serialize time; parsing only derives ingredientIds)
+		expect(r.steps[0].body).toContain('@pancetta{200%g}');
+		expect(r.steps[0].body).toContain('~{30%seconds}');
 	});
 });
 
