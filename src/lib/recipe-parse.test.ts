@@ -8,9 +8,10 @@ import {
 	serializeIngredients,
 	serializeMethod,
 	serializeRecipe,
-	tokenizeStepBody
+	tokenizeStepBody,
+	linkStepIngredients
 } from './recipe-parse';
-import { coerceRecipeInput } from './recipe';
+import { coerceRecipeInput, blankIngredient, blankStep } from './recipe';
 
 describe('parseIngredient', () => {
 	it('splits quantity / unit / name / comment', () => {
@@ -266,5 +267,49 @@ describe('tokenizeStepBody', () => {
 		expect(segs[1]).toEqual({
 			type: 'ingredient', name: 'chicken breast', quantity: '', unit: '', quantity2: '', unit2: ''
 		});
+	});
+});
+
+describe('linkStepIngredients', () => {
+	it('creates a new canonical ingredient from a token not in the input list', () => {
+		const steps = [{ ...blankStep(), body: 'Fry @pancetta{200%g} until crispy.' }];
+		const { ingredients, steps: out } = linkStepIngredients([], steps);
+		expect(ingredients).toHaveLength(1);
+		expect(ingredients[0]).toMatchObject({ name: 'pancetta', quantity: '200', unit: 'g' });
+		expect(out[0].ingredientIds).toEqual([ingredients[0].id]);
+	});
+
+	it('reuses an existing ingredient by normalized name instead of duplicating it', () => {
+		const existing = { ...blankIngredient(), name: 'Pancetta', quantity: '', unit: '' };
+		const steps = [{ ...blankStep(), body: 'Add @pancetta{200%g} to the pan.' }];
+		const { ingredients, steps: out } = linkStepIngredients([existing], steps);
+		expect(ingredients).toHaveLength(1);
+		expect(ingredients[0].id).toBe(existing.id);
+		expect(out[0].ingredientIds).toEqual([existing.id]);
+	});
+
+	it('links the same ingredient across multiple steps to one canonical row', () => {
+		const steps = [
+			{ ...blankStep(), body: 'Fry @pancetta{200%g}.' },
+			{ ...blankStep(), body: 'Add the crispy @pancetta back in.' }
+		];
+		const { ingredients, steps: out } = linkStepIngredients([], steps);
+		expect(ingredients).toHaveLength(1);
+		expect(out[0].ingredientIds).toEqual([ingredients[0].id]);
+		expect(out[1].ingredientIds).toEqual([ingredients[0].id]);
+	});
+
+	it('preserves ingredients from the "other ingredients" list that no step mentions', () => {
+		const cookingSpray = { ...blankIngredient(), name: 'cooking spray' };
+		const { ingredients } = linkStepIngredients([cookingSpray], [{ ...blankStep(), body: 'Bake it.' }]);
+		expect(ingredients).toEqual([cookingSpray]);
+	});
+
+	it('keeps pre-existing explicit ingredientIds on a step alongside token-derived ones', () => {
+		const existing = { ...blankIngredient(), name: 'salt' };
+		const steps = [{ ...blankStep(), body: 'Add @pepper{1%tsp}.', ingredientIds: [existing.id] }];
+		const { steps: out } = linkStepIngredients([existing], steps);
+		expect(out[0].ingredientIds).toEqual(expect.arrayContaining([existing.id]));
+		expect(out[0].ingredientIds).toHaveLength(2);
 	});
 });

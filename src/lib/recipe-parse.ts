@@ -13,6 +13,7 @@ import {
 	type RecipeInput
 } from './recipe';
 import { canonicalizeUnit, isMetricUnit, parseIngredientLine, sameMeasureKind } from './units';
+import { normalizeName } from './types';
 
 const PREP_WORDS = new Set([
 	'diced', 'chopped', 'minced', 'sliced', 'grated', 'shredded', 'crushed', 'ground',
@@ -346,6 +347,45 @@ function splitQtyUnitMain(inner: string): {
 	const main = splitQtyUnit(mainRaw ?? '');
 	const alt = splitQtyUnit(altRaw ?? '');
 	return { q: { quantity: main.q, unit: main.u }, u: { quantity: alt.q, unit: alt.u } };
+}
+
+/** Merge `@token`-declared ingredients (found in step bodies) into the canonical
+ *  ingredient list, and populate each step's `ingredientIds` from those tokens —
+ *  merged with whatever explicit ids the step already carried. Ingredients that
+ *  no step mentions (the "other ingredients" block) pass through untouched. */
+export function linkStepIngredients(
+	otherIngredients: RecipeIngredient[],
+	steps: RecipeInput['steps']
+): { ingredients: RecipeIngredient[]; steps: RecipeInput['steps'] } {
+	const working = [...otherIngredients];
+	const byNorm = new Map(working.map((i) => [normalizeName(i.name), i]));
+
+	const outSteps = steps.map((s) => {
+		const tokenIds: string[] = [];
+		for (const seg of tokenizeStepBody(s.body)) {
+			if (seg.type !== 'ingredient') continue;
+			const key = normalizeName(seg.name);
+			if (!key) continue;
+			let ing = byNorm.get(key);
+			if (!ing) {
+				ing = {
+					...blankIngredient(),
+					name: seg.name,
+					quantity: seg.quantity,
+					unit: canonicalizeUnit(seg.unit),
+					quantity2: seg.quantity2,
+					unit2: canonicalizeUnit(seg.unit2),
+					group: s.group
+				};
+				working.push(ing);
+				byNorm.set(key, ing);
+			}
+			tokenIds.push(ing.id);
+		}
+		return { ...s, ingredientIds: [...new Set([...s.ingredientIds, ...tokenIds])] };
+	});
+
+	return { ingredients: working, steps: outSteps };
 }
 
 /** Back-compat name used by the import module. */
