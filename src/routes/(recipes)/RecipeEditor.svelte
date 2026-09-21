@@ -46,7 +46,12 @@
 	);
 
 	const parsedIng = $derived(parseIngredientsBlock(ingredientsText));
-	const linked = $derived(linkStepIngredients(parsedIng.ingredients, steps));
+	const linked = $derived(
+		linkStepIngredients(
+			parsedIng.ingredients,
+			steps.filter((s) => s.body.trim() || s.includes.length)
+		)
+	);
 
 	const payload = $derived(
 		JSON.stringify({
@@ -185,12 +190,14 @@
 			servings = recipe.servings || servings;
 			if (recipe.notes) notes = recipe.notes;
 			ingredientsText = serializeIngredients(recipe.ingredients, recipe.miseEnPlaceIncludes);
-			steps = recipe.steps.map((s) => ({
-				body: s.body,
-				group: s.group,
-				ingredientIds: s.ingredientIds,
-				includes: s.includes
-			}));
+			steps = recipe.steps.length
+				? recipe.steps.map((s) => ({
+						body: s.body,
+						group: s.group,
+						ingredientIds: s.ingredientIds,
+						includes: s.includes
+					}))
+				: [{ body: '', group: '', ingredientIds: [], includes: [] }];
 			tidyOpen = false;
 			tidyInstruction = '';
 		} catch (e) {
