@@ -47,6 +47,18 @@ function seedCatalogItem(name: string) {
 }
 
 describe('saveRecipe / getRecipe', () => {
+	it('saveRecipe derives and links an ingredient declared only via an inline @ token', () => {
+		const id = saveRecipe(db, null, {
+			...emptyRecipeInput(),
+			title: 'Carbonara',
+			steps: [{ ...blankStep(), body: 'Fry @pancetta{200%g} until crispy.' }]
+		});
+		const full = getRecipe(db, id)!;
+		expect(full.ingredients.map((i) => i.name)).toContain('pancetta');
+		const pancettaRow = full.ingredients.find((i) => i.name === 'pancetta')!;
+		expect(full.stepIngredients.map((si) => si.ingredient_id)).toContain(pancettaRow.id);
+	});
+
 	it('round-trips ingredients (with comment/group) and derives step links from prose', () => {
 		const id = saveRecipe(
 			db,

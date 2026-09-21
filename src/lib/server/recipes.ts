@@ -18,6 +18,7 @@ import {
 	type ResolvedChild,
 	type ResolvedIngredient
 } from '../recipe';
+import { linkStepIngredients } from '../recipe-parse';
 
 export interface RecipeRow {
 	id: string;
@@ -177,6 +178,8 @@ export function saveRecipe(db: DB, id: string | null, input: RecipeInput): strin
 	const now = Date.now();
 	const recipeId = id ?? uuid();
 	const titleNorm = normalizeName(input.title);
+	const linked = linkStepIngredients(input.ingredients, input.steps);
+	input = { ...input, ingredients: linked.ingredients, steps: linked.steps };
 
 	const tx = db.transaction(() => {
 		const exists = id ? db.prepare(`SELECT 1 FROM recipes WHERE id = ?`).get(id) : null;
