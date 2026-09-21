@@ -23,6 +23,10 @@
 			return;
 		}
 		const range = sel.getRangeAt(0).cloneRange();
+		if (!el.contains(range.commonAncestorContainer)) {
+			toolbar = null;
+			return;
+		}
 		const text = range.toString().trim();
 		if (!text) {
 			toolbar = null;
@@ -102,10 +106,16 @@
 		chip.contentEditable = 'false';
 		chip.dataset.token = token;
 		chip.textContent = label;
-		toolbar.range.deleteContents();
-		toolbar.range.insertNode(chip);
-		toolbar = null;
-		onInput();
+		try {
+			toolbar.range.deleteContents();
+			toolbar.range.insertNode(chip);
+			onInput();
+		} catch {
+			// the selection's Range went stale (DOM changed between selecting and
+			// clicking, e.g. an external body update) — nothing to insert into.
+		} finally {
+			toolbar = null;
+		}
 	}
 
 	const DURATION_RE = /(\d+(?:\.\d+)?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)/i;
@@ -129,16 +139,22 @@
 	function markNote() {
 		if (!el) return;
 		const text = toolbar?.text ?? '';
-		if (toolbar) toolbar.range.deleteContents();
-		el.appendChild(document.createTextNode(' '));
-		const chip = document.createElement('span');
-		chip.className = 'chip chip-cmt';
-		chip.contentEditable = 'false';
-		chip.dataset.token = `-- ${text}`;
-		chip.textContent = text || 'note';
-		el.appendChild(chip);
-		toolbar = null;
-		onInput();
+		try {
+			if (toolbar) toolbar.range.deleteContents();
+			el.appendChild(document.createTextNode(' '));
+			const chip = document.createElement('span');
+			chip.className = 'chip chip-cmt';
+			chip.contentEditable = 'false';
+			chip.dataset.token = `-- ${text}`;
+			chip.textContent = text || 'note';
+			el.appendChild(chip);
+			onInput();
+		} catch {
+			// the selection's Range went stale (DOM changed between selecting and
+			// clicking, e.g. an external body update) — nothing to delete/insert into.
+		} finally {
+			toolbar = null;
+		}
 	}
 </script>
 
