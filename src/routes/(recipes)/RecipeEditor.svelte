@@ -34,6 +34,7 @@
 	let servings = $state(seed.servings);
 	let notes = $state(seed.notes);
 	let sourceUrl = $state(seed.source_url);
+	let isPrep = $state(seed.is_prep);
 	let ingredientsText = $state(serializeIngredients(seed.ingredients, seed.miseEnPlaceIncludes));
 	let methodText = $state(
 		serializeMethod(seed.steps.map((s) => ({ body: s.body, group: s.group, includes: s.includes })))
@@ -48,6 +49,7 @@
 			servings,
 			notes,
 			source_url: sourceUrl,
+			is_prep: isPrep,
 			ingredients: parsedIng.ingredients,
 			miseEnPlaceIncludes: [...parsedIng.includes, ...parsedMethod.leadingIncludes],
 			steps: parsedMethod.steps
@@ -221,6 +223,10 @@
 		<label class="fieldrow"><span>Servings</span><input class="field" bind:value={servings} placeholder="4" /></label>
 		<label class="fieldrow"><span>Source URL</span><input class="field" bind:value={sourceUrl} placeholder="optional" /></label>
 	</div>
+	<label class="fieldrow chk">
+		<input type="checkbox" bind:checked={isPrep} />
+		<span>Weekend batch-prep recipe</span>
+	</label>
 	<label class="fieldrow"><span>Notes</span><textarea class="field" bind:value={notes}></textarea></label>
 
 	<section class="card">
@@ -351,6 +357,7 @@
 	.fieldrow { display: flex; flex-direction: column; gap: 0.25rem; }
 	.fieldrow > span { font-size: 0.8rem; color: var(--text-2); }
 	.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+	.chk { flex-direction: row; align-items: center; gap: 0.4rem; }
 	.card { border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem; display: flex; flex-direction: column; gap: 0.5rem; }
 	.card h3 { margin: 0; font-size: 0.95rem; }
 	.hint { margin: 0; font-size: 0.76rem; color: var(--text-2); line-height: 1.5; }

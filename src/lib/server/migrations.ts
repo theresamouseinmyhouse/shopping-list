@@ -7,6 +7,7 @@ import m0004 from '../../../migrations/0004_qty.sql?raw';
 import m0005 from '../../../migrations/0005_recipes.sql?raw';
 import m0006 from '../../../migrations/0006_recipe_ingredients.sql?raw';
 import m0007 from '../../../migrations/0007_recipe_parse.sql?raw';
+import m0008 from '../../../migrations/0008_recipe_prep.sql?raw';
 
 export interface Migration {
 	name: string;
@@ -20,5 +21,6 @@ export const MIGRATIONS: Migration[] = [
 	{ name: '0004_qty', sql: m0004 },
 	{ name: '0005_recipes', sql: m0005 },
 	{ name: '0006_recipe_ingredients', sql: m0006 },
-	{ name: '0007_recipe_parse', sql: m0007 }
+	{ name: '0007_recipe_parse', sql: m0007 },
+	{ name: '0008_recipe_prep', sql: m0008 }
 ];

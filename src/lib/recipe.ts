@@ -40,6 +40,7 @@ export interface RecipeInput {
 	servings: string;
 	notes: string;
 	source_url: string;
+	is_prep: boolean;
 	ingredients: RecipeIngredient[];
 	/** sub-recipes not tied to any step (the "components" block) */
 	miseEnPlaceIncludes: string[];
@@ -52,6 +53,7 @@ export function emptyRecipeInput(): RecipeInput {
 		servings: '',
 		notes: '',
 		source_url: '',
+		is_prep: false,
 		ingredients: [],
 		miseEnPlaceIncludes: [],
 		steps: []
@@ -124,6 +126,7 @@ export interface ResolvedRecipe {
 	servings: string;
 	notes: string;
 	source_url: string;
+	is_prep: boolean;
 	ingredients: ResolvedIngredient[];
 	steps: ResolvedStep[];
 	components: ResolvedChild[];
@@ -176,6 +179,7 @@ export function coerceRecipeInput(raw: unknown): RecipeInput {
 		servings: str(o.servings).trim(),
 		notes: str(o.notes),
 		source_url: str(o.source_url).trim(),
+		is_prep: !!o.is_prep,
 		ingredients,
 		miseEnPlaceIncludes: (Array.isArray(o.miseEnPlaceIncludes) ? o.miseEnPlaceIncludes : [])
 			.map(str)

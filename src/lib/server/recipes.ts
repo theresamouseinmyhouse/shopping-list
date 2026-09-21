@@ -27,6 +27,7 @@ export interface RecipeRow {
 	servings: string;
 	notes: string;
 	source_url: string;
+	is_prep: 0 | 1;
 	created_at: number;
 	updated_at: number;
 	deleted_at: number | null;
@@ -82,6 +83,15 @@ export function listRecipes(db: DB): { id: string; title: string; servings: stri
 	return db
 		.prepare(
 			`SELECT id, title, servings FROM recipes WHERE deleted_at IS NULL
+			 ORDER BY title COLLATE NOCASE`
+		)
+		.all() as { id: string; title: string; servings: string }[];
+}
+
+export function listPrepRecipes(db: DB): { id: string; title: string; servings: string }[] {
+	return db
+		.prepare(
+			`SELECT id, title, servings FROM recipes WHERE deleted_at IS NULL AND is_prep = 1
 			 ORDER BY title COLLATE NOCASE`
 		)
 		.all() as { id: string; title: string; servings: string }[];
@@ -162,6 +172,7 @@ export function fullRecipeToInput(db: DB, full: FullRecipe): RecipeInput {
 		servings: full.recipe.servings,
 		notes: full.recipe.notes,
 		source_url: full.recipe.source_url,
+		is_prep: !!full.recipe.is_prep,
 		ingredients: full.ingredients.map(ingToTransport),
 		miseEnPlaceIncludes: incFor(null),
 		steps: full.steps.map((s) => ({
@@ -186,8 +197,17 @@ export function saveRecipe(db: DB, id: string | null, input: RecipeInput): strin
 		if (exists) {
 			db.prepare(
 				`UPDATE recipes SET title = ?, title_norm = ?, servings = ?, notes = ?,
-				   source_url = ?, updated_at = ?, deleted_at = NULL WHERE id = ?`
-			).run(input.title.trim(), titleNorm, input.servings.trim(), input.notes, input.source_url.trim(), now, recipeId);
+				   source_url = ?, is_prep = ?, updated_at = ?, deleted_at = NULL WHERE id = ?`
+			).run(
+				input.title.trim(),
+				titleNorm,
+				input.servings.trim(),
+				input.notes,
+				input.source_url.trim(),
+				input.is_prep ? 1 : 0,
+				now,
+				recipeId
+			);
 			const oldSteps = db.prepare(`SELECT id FROM recipe_steps WHERE recipe_id = ?`).all(recipeId) as {
 				id: string;
 			}[];
@@ -198,9 +218,19 @@ export function saveRecipe(db: DB, id: string | null, input: RecipeInput): strin
 			db.prepare(`DELETE FROM recipe_steps WHERE recipe_id = ?`).run(recipeId);
 		} else {
 			db.prepare(
-				`INSERT INTO recipes (id, title, title_norm, servings, notes, source_url, created_at, updated_at, deleted_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`
-			).run(recipeId, input.title.trim(), titleNorm, input.servings.trim(), input.notes, input.source_url.trim(), now, now);
+				`INSERT INTO recipes (id, title, title_norm, servings, notes, source_url, is_prep, created_at, updated_at, deleted_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`
+			).run(
+				recipeId,
+				input.title.trim(),
+				titleNorm,
+				input.servings.trim(),
+				input.notes,
+				input.source_url.trim(),
+				input.is_prep ? 1 : 0,
+				now,
+				now
+			);
 		}
 
 		// steps
@@ -355,6 +385,7 @@ export function resolveRecipeTree(
 		servings: full.recipe.servings,
 		notes: full.recipe.notes,
 		source_url: full.recipe.source_url,
+		is_prep: !!full.recipe.is_prep,
 		ingredients: full.ingredients.map(ingToResolved),
 		steps: full.steps.map((s) => ({
 			id: s.id,

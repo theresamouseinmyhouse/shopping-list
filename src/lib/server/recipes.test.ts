@@ -8,6 +8,7 @@ import {
 	saveRecipe,
 	getRecipe,
 	listRecipes,
+	listPrepRecipes,
 	deleteRecipe,
 	fullRecipeToInput,
 	resolveRecipeTree,
@@ -174,5 +175,22 @@ describe('deleteRecipe', () => {
 		deleteRecipe(db, id);
 		expect(getRecipe(db, id)).toBeNull();
 		expect(listRecipes(db)).toHaveLength(0);
+	});
+});
+
+describe('is_prep', () => {
+	it('is_prep round-trips through save and get, defaulting to false', () => {
+		const id1 = saveRecipe(db, null, { ...emptyRecipeInput(), title: 'Everyday Chili' });
+		expect(getRecipe(db, id1)!.recipe.is_prep).toBe(0);
+
+		const id2 = saveRecipe(db, null, { ...emptyRecipeInput(), title: 'Batch Beans', is_prep: true });
+		expect(getRecipe(db, id2)!.recipe.is_prep).toBe(1);
+	});
+
+	it('listPrepRecipes returns only is_prep recipes', () => {
+		saveRecipe(db, null, { ...emptyRecipeInput(), title: 'Everyday Chili' });
+		const id = saveRecipe(db, null, { ...emptyRecipeInput(), title: 'Batch Beans', is_prep: true });
+		const rows = listPrepRecipes(db);
+		expect(rows.map((r) => r.id)).toEqual([id]);
 	});
 });

@@ -1,21 +1,35 @@
 <script lang="ts">
 	import Screen from '$lib/nav/Screen.svelte';
 	let { data } = $props();
+	let showPrepOnly = $state(false);
+	const shown = $derived(showPrepOnly ? data.prepRecipes : data.recipes);
 </script>
 
 <svelte:head><title>Recipes</title></svelte:head>
 
 <Screen title="Recipes">
 	{#snippet actions()}
+		<button
+			type="button"
+			class="btn btn-sm"
+			class:btn-primary={showPrepOnly}
+			onclick={() => (showPrepOnly = !showPrepOnly)}
+		>
+			Prep only
+		</button>
 		<a class="btn btn-sm" href="/recipes/import">Import</a>
 		<a class="btn btn-sm btn-primary" href="/recipes/new">New</a>
 	{/snippet}
 
-	{#if !data.recipes.length}
-		<p class="empty">No recipes yet. Add one, or import from a photo or a link.</p>
+	{#if !shown.length}
+		<p class="empty">
+			{showPrepOnly
+				? 'No batch-prep recipes yet. Mark one as a prep recipe in the editor.'
+				: 'No recipes yet. Add one, or import from a photo or a link.'}
+		</p>
 	{:else}
 		<div class="group">
-			{#each data.recipes as r (r.id)}
+			{#each shown as r (r.id)}
 				<a class="row" href={`/recipes/${r.id}`}>
 					<span class="name">{r.title}</span>
 					<span class="spacer"></span>
