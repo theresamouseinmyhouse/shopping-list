@@ -2,6 +2,7 @@
 	import { type ResolvedRecipe, type ResolvedChild, type ResolvedIngredient } from '$lib/recipe';
 	import { formatAmount } from '$lib/units';
 	import { scaleQuantity, parseQuantity, formatQuantity } from '$lib/scale';
+	import { tokenizeStepBody, type StepSegment } from '$lib/recipe-parse';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Self from './RecipeBody.svelte';
 
@@ -40,6 +41,11 @@
 		const b = one(i.quantity2, i.unit2);
 		const [main, alt] = i.preferAlt && b ? [b, a] : [a, b];
 		return alt ? `${main} (${alt})` : main;
+	}
+
+	function timerLabel(t: { label: string; quantity: string; unit: string }): string {
+		const amt = [t.quantity, t.unit].filter(Boolean).join(' ');
+		return t.label ? `${t.label}: ${amt}` : amt;
 	}
 
 	const scaledServings = $derived.by(() => {
@@ -117,7 +123,15 @@
 				<h5 class="stepgrp">{s.group}</h5>
 			{/if}
 			<li class="step">
-				<p class="body">{s.body}</p>
+				<p class="body">
+					{#each tokenizeStepBody(s.body) as seg}
+						{#if seg.type === 'text'}{seg.text}
+						{:else if seg.type === 'ingredient'}<span class="tok-ing">{seg.name}</span>
+						{:else if seg.type === 'timer'}<span class="tok-timer">⏱ {timerLabel(seg)}</span>
+						{:else}<span class="tok-cmt">{seg.text}</span>
+						{/if}
+					{/each}
+				</p>
 				{#if s.ingredients.length}
 					<p class="stepings">
 						{#each s.ingredients as ing (ing.id)}<span class="pill">{amount(ing)} {ing.name}</span>{/each}
@@ -146,6 +160,9 @@
 	.body { margin: 0.3rem 0; white-space: pre-wrap; }
 	.stepings { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.2rem 0; }
 	.pill { background: var(--surface-2); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.8rem; }
+	.tok-ing { background: var(--accent-weak); border-radius: 0.3rem; padding: 0 0.25rem; }
+	.tok-timer { background: var(--surface-2); border-radius: 0.3rem; padding: 0 0.3rem; font-size: 0.85em; white-space: nowrap; }
+	.tok-cmt { color: var(--text-3); font-size: 0.9em; }
 	.embed { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0.4rem; margin: 0.6rem 0; background: var(--surface-1); overflow: hidden; }
 	.embed-head {
 		display: flex;
@@ -170,6 +187,7 @@
 	@media print {
 		.step, .embed { break-inside: avoid; }
 		.pill { border: 1px solid #999; background: none; }
+		.tok-ing, .tok-timer { background: none; }
 		/* always print sub-recipes in full, even if collapsed on screen */
 		.embed-body[hidden] { display: block !important; }
 		.embed-head :global(.chev), .embed-more { display: none; }
