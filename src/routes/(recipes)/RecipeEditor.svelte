@@ -66,6 +66,23 @@
 		)
 	);
 
+	// linkStepIngredients synthesizes a fresh (comment/group-less) ingredient for
+	// any @token whose name isn't already in the "Other ingredients" list (which
+	// deliberately excludes token-derived items, see the tokenizedNames filter
+	// above) — backfill comment/group from the original saved recipe for those,
+	// so reopening and saving with no changes doesn't silently drop them. An
+	// ingredient still present in parsedIng.ingredients came from the live-edited
+	// textarea and already has correct, current comment/group — leave it alone.
+	const linkedIngredients = $derived.by(() => {
+		const seedByNorm = new Map(seed.ingredients.map((i) => [normalizeName(i.name), i]));
+		const parsedIds = new Set(parsedIng.ingredients.map((i) => i.id));
+		return linked.ingredients.map((ing) => {
+			if (parsedIds.has(ing.id)) return ing;
+			const original = seedByNorm.get(normalizeName(ing.name));
+			return original ? { ...ing, comment: original.comment, group: original.group } : ing;
+		});
+	});
+
 	const payload = $derived(
 		JSON.stringify({
 			title,
@@ -73,7 +90,7 @@
 			notes,
 			source_url: sourceUrl,
 			is_prep: isPrep,
-			ingredients: linked.ingredients,
+			ingredients: linkedIngredients,
 			miseEnPlaceIncludes: parsedIng.includes,
 			steps: linked.steps
 		} satisfies RecipeInput)
